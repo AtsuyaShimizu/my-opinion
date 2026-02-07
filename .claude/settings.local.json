@@ -1,0 +1,15 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(xargs stat:*)",
+      "WebSearch",
+      "Bash(npm run type-check:*)",
+      "WebFetch(domain:supabase.com)",
+      "Bash(npm run build:*)",
+      "Bash(npx next build:*)",
+      "Bash(npx tsc:*)",
+      "Bash(npx shadcn@latest add:*)",
+      "Bash(ls:*)"
+    ]
+  }
+}
