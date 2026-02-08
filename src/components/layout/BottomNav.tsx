@@ -11,6 +11,7 @@ import {
   User,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useUnreadCount } from "@/hooks/useUnreadCount";
 
 const navItems = [
   { href: "/home", label: "ホーム", icon: Home },
@@ -22,12 +23,14 @@ const navItems = [
 
 export function BottomNav() {
   const pathname = usePathname();
+  const unreadCount = useUnreadCount();
 
   return (
     <nav className="fixed bottom-0 left-0 right-0 z-50 border-t bg-background lg:hidden">
       <div className="flex h-16 items-center justify-around">
         {navItems.map((item) => {
           const isActive = pathname.startsWith(item.href);
+          const isNotification = item.href === "/notifications";
           return (
             <Link
               key={item.href}
@@ -39,7 +42,14 @@ export function BottomNav() {
                   : "text-muted-foreground hover:text-foreground"
               )}
             >
-              <item.icon className={cn("h-5 w-5", isActive && "text-primary")} />
+              <span className="relative">
+                <item.icon className={cn("h-5 w-5", isActive && "text-primary")} />
+                {isNotification && unreadCount > 0 && (
+                  <span className="absolute -right-1.5 -top-1.5 flex h-3.5 min-w-3.5 items-center justify-center rounded-full bg-destructive px-0.5 text-[9px] font-bold text-destructive-foreground">
+                    {unreadCount > 99 ? "99+" : unreadCount}
+                  </span>
+                )}
+              </span>
               <span>{item.label}</span>
             </Link>
           );

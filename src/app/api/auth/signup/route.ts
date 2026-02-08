@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { createServiceClient } from "@/lib/supabase/service";
 import { signupSchema } from "@/lib/validations/auth";
 
 export async function POST(request: NextRequest) {
@@ -86,17 +87,20 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    const userId = authData.user.id;
+    const serviceClient = createServiceClient();
+
     // 4. Create user record in users table
-    // TODO: Auth作成後にusersテーブルINSERTが失敗した場合、Authユーザーが残る。
-    // 将来的にはトランザクション的なロールバック処理（auth.admin.deleteUser）を検討。
     const { error: userError } = await supabase.from("users").insert({
-      id: authData.user.id,
+      id: userId,
       email,
       user_handle: userHandle,
       display_name: displayName,
     });
 
     if (userError) {
+      // Rollback: delete the orphaned Auth user
+      await serviceClient.auth.admin.deleteUser(userId);
       return NextResponse.json(
         { error: "ユーザー情報の保存に失敗しました", status: 500 },
         { status: 500 }
@@ -104,35 +108,54 @@ export async function POST(request: NextRequest) {
     }
 
     // 5. Create user_attributes record (empty defaults)
-    await supabase.from("user_attributes").insert({
-      user_id: authData.user.id,
+    const { error: attrError } = await supabase.from("user_attributes").insert({
+      user_id: userId,
     });
+
+    if (attrError) {
+      await supabase.from("users").delete().eq("id", userId);
+      await serviceClient.auth.admin.deleteUser(userId);
+      return NextResponse.json(
+        { error: "ユーザー属性の初期化に失敗しました", status: 500 },
+        { status: 500 }
+      );
+    }
 
     // 6. Record consent (terms, privacy, sensitive info)
     const consentVersion = "1.0";
-    await supabase.from("consent_records").insert([
+    const { error: consentError } = await supabase.from("consent_records").insert([
       {
-        user_id: authData.user.id,
+        user_id: userId,
         consent_type: "terms_of_service",
         consent_version: consentVersion,
       },
       {
-        user_id: authData.user.id,
+        user_id: userId,
         consent_type: "privacy_policy",
         consent_version: consentVersion,
       },
       {
-        user_id: authData.user.id,
+        user_id: userId,
         consent_type: "sensitive_personal_info",
         consent_version: consentVersion,
       },
     ]);
 
+    if (consentError) {
+      await supabase.from("user_attributes").delete().eq("user_id", userId);
+      await supabase.from("users").delete().eq("id", userId);
+      await serviceClient.auth.admin.deleteUser(userId);
+      return NextResponse.json(
+        { error: "同意記録の保存に失敗しました", status: 500 },
+        { status: 500 }
+      );
+    }
+
     // 7. Mark invite code as used
     await supabase
       .from("invite_codes")
       .update({
-        used_by: authData.user.id,
+        used_by: userId,
         used_at: new Date().toISOString(),
       })
       .eq("id", invite.id);

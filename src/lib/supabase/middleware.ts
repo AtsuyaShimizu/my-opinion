@@ -29,8 +29,8 @@ export async function updateSession(request: NextRequest) {
     }
   );
 
-  // Refresh the session if it exists
-  await supabase.auth.getUser();
+  // Refresh the session and get the user
+  const { data: { user } } = await supabase.auth.getUser();
 
-  return supabaseResponse;
+  return { response: supabaseResponse, user };
 }

@@ -118,9 +118,7 @@ export default function UserProfilePage({
     );
   }, [fetchProfile, fetchPosts]);
 
-  // TODO: /api/users/${handle}/follow APIルートが未実装。
-  // 現在フォローAPIは /api/follows/[userId] (IDベース) で実装されている。
-  // ハンドルベースのフォローAPIを追加するか、プロフィールのIDを使ってフォローする必要がある。
+  // フォローAPIは /api/follows/[userId] (IDベース) を使用
   async function handleFollow() {
     if (!profile) return;
     try {

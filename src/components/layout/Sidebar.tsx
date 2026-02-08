@@ -13,6 +13,7 @@ import {
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
+import { useUnreadCount } from "@/hooks/useUnreadCount";
 
 const navItems = [
   { href: "/home", label: "ホーム", icon: Home },
@@ -24,6 +25,7 @@ const navItems = [
 
 export function Sidebar() {
   const pathname = usePathname();
+  const unreadCount = useUnreadCount();
 
   return (
     <aside className="hidden lg:flex lg:w-64 lg:flex-col lg:fixed lg:inset-y-0 lg:border-r lg:bg-background">
@@ -36,6 +38,7 @@ export function Sidebar() {
       <nav className="flex flex-1 flex-col gap-1 p-4">
         {navItems.map((item) => {
           const isActive = pathname.startsWith(item.href);
+          const isNotification = item.href === "/notifications";
           return (
             <Button
               key={item.href}
@@ -47,7 +50,14 @@ export function Sidebar() {
               asChild
             >
               <Link href={item.href}>
-                <item.icon className="h-5 w-5" />
+                <span className="relative">
+                  <item.icon className="h-5 w-5" />
+                  {isNotification && unreadCount > 0 && (
+                    <span className="absolute -right-1.5 -top-1.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-destructive px-1 text-[10px] font-bold text-destructive-foreground">
+                      {unreadCount > 99 ? "99+" : unreadCount}
+                    </span>
+                  )}
+                </span>
                 {item.label}
               </Link>
             </Button>
