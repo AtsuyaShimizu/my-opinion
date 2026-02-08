@@ -1,69 +1,110 @@
 # バックエンド詳細ドキュメント
 
-## 1. 技術スタックと構成
-- **Next.js API Routes (App Router)** をバックエンドとして使用します。
-- APIは `src/app/api` 配下に集約され、ファイルパスがそのままエンドポイントに対応します。
-- データストアは Supabase (PostgreSQL) を使用し、RLSでアクセス制御を行います。
+このプロジェクトのバックエンドは **Next.js App Router の API Routes** で構成されています。  
+「APIがどこに書いてあるか」「DBや認証がどこで扱われているか」を中心に説明します。
 
-## 2. APIルート構成
-主なAPI領域は以下の通りです。
+## 1. バックエンドの全体像（最短で把握するための地図）
+- **APIの入口はすべて `src/app/api`**  
+  フォルダ構成がそのままURLになります。
+- **DBは Supabase (PostgreSQL)**  
+  RLS（Row Level Security）でアクセス制御を行います。
+- **DBスキーマとRLSは `supabase/migrations`**  
+  SQLファイルでテーブル・ポリシー・インデックスが定義されています。
 
-- **認証**: `/api/auth/*`
-  - ログイン、サインアップ、ログアウト、パスワード更新
-- **投稿**: `/api/posts/*`
-  - 投稿作成、取得、削除、返信、リポスト、リアクション、分析
-- **タイムライン**: `/api/timeline/*`
-  - ホーム/探索/テーマ別の一覧
-- **ユーザー**: `/api/users/*`
-  - プロフィール取得、フォロー/フォロワー、属性更新
-- **通知**: `/api/notifications/*`
-  - 通知一覧、未読数、既読化
-- **テーマ**: `/api/themes/*`
-  - テーマ一覧、詳細
-- **招待**: `/api/invite/*`
-  - 招待コードの生成・検証・利用
+## 2. フォルダ構成（どこに何があるか）
+```
+src/
+  app/api/            APIルート（/api/...）
+  lib/supabase/       Supabase接続（通常/特権/ミドルウェア）
+  lib/validations/    入力バリデーション（zod）
+  types/              型定義（DBやAPIレスポンス）
+supabase/
+  migrations/         DBテーブル/RLS/インデックス定義
+```
+
+## 3. APIルーティングの仕組み
+Next.js App Routerでは **`route.ts` がAPIエンドポイント** になります。
+
+例:
+- `src/app/api/posts/route.ts` → `POST /api/posts` など
+- `src/app/api/posts/[id]/route.ts` → `/api/posts/:id`
+
+`[id]` や `[handle]` のような角括弧付きフォルダは **動的パラメータ**です。
+
+## 4. API領域一覧（主要エンドポイント）
+- **認証**: `/api/auth/*`  
+  `signup`, `login`, `logout`, `reset-password`, `update-password`, `callback`
+- **投稿**: `/api/posts/*`  
+  `POST /api/posts`, `GET/DELETE /api/posts/:id` など
+- **タイムライン**: `/api/timeline/*`  
+  `home`, `explore`, `theme`
+- **ユーザー**: `/api/users/*`  
+  `GET /api/users/:handle`, `GET /api/users/me`
+- **フォロー**: `/api/follows/*`  
+  `POST/DELETE /api/follows/:userId`
+- **通知**: `/api/notifications/*`  
+  一覧、既読化、未読数など
+- **テーマ**: `/api/themes/*`  
+  一覧、詳細
+- **招待**: `/api/invite/*`  
+  生成、検証、利用
 - **通報**: `/api/reports`
-  - 通報作成
-- **管理**: `/api/admin/*`
-  - ユーザー管理、テーマ管理、通報管理、統計
 - **同意**: `/api/consent/*`
-  - 同意記録の取得・登録・削除
+- **管理**: `/api/admin/*`  
+  `users`, `posts`, `reports`, `themes`, `stats`, `invite`
 
-## 3. Supabaseクライアントの使い分け
-- `src/lib/supabase/server.ts`
-  - `createServerClient()` を使用してRLS適用下でアクセス。
-  - すべての通常APIで利用されます。
-- `src/lib/supabase/service.ts`
-  - サービスロールキーを使用し、RLSをバイパスする特権クライアント。
-  - 通知生成や管理者処理など、権限が必要なケースで使用。
+## 5. Supabaseクライアントの使い分け
+`src/lib/supabase` に用途別のクライアントがあります。
 
-## 4. 認証・認可
-- 各APIは `supabase.auth.getUser()` でログインユーザーを取得し、
-  認証済みであることを前提に処理します。
-- 管理者専用APIは RLS の `is_admin()` 関数によってDB側でも保護されます。
+- `server.ts`  
+  `createServerClient()` を使い、**RLSが効いた通常アクセス**を行います。
+- `service.ts`  
+  サービスロールキーで **RLSをバイパスする特権アクセス**を行います。  
+  （通知生成や管理者処理など）
+- `middleware.ts`  
+  セッション更新や認証情報の取得をミドルウェアで行います。
 
-## 5. エラーハンドリング
-- APIは `data` / `error` のJSONレスポンスを返す設計です。
-- クライアント側の `apiFetch()` が共通のエラー処理を行います。
+## 6. 入力バリデーション
+- `src/lib/validations/*`  
+  zodで入力スキーマを定義しています。
+  - `auth.ts` : ログイン/サインアップの入力
+  - `post.ts` : 投稿・返信
+  - `profile.ts` : プロフィール更新
+  - `consent.ts` : 同意記録
 
-## 6. 代表的な処理フロー
+## 7. DBスキーマ/権限の置き場所
+`supabase/migrations` にSQLがまとまっています。
 
-### 6.1 投稿作成
-1. クライアントが `/api/posts` にPOST。
-2. APIで認証ユーザー取得。
-3. `posts` テーブルにINSERT。
-4. テーマ投稿であれば `theme_posts` を追加。
+- `00001_create_tables.sql`  
+  テーブルや型の作成。
+- `00002_create_rls_policies.sql`  
+  RLSポリシー（認可ルール）。
+- `00003_create_indexes.sql`  
+  パフォーマンス向上のためのインデックス。
 
-### 6.2 通知生成
-1. 通知作成が必要なAPIでサービスロールクライアントを利用。
+## 8. 認証・認可の流れ
+1. API側で `supabase.auth.getUser()` によりログインユーザーを取得。
+2. **未ログインの場合はエラーを返す**。
+3. DB側でRLSが効くため、**ユーザー権限に応じたデータだけ取得**されます。
+4. 管理者APIはDBの `is_admin()` 判定を通らないと実行できません。
+
+## 9. 代表的な処理フロー（例）
+### 9.1 投稿作成
+1. フロントが `POST /api/posts` を実行。
+2. APIでユーザーを取得し、入力を `post.ts` のスキーマで検証。
+3. `posts` テーブルへINSERT。
+4. 必要なら `theme_posts` に紐付け。
+
+### 9.2 通知生成
+1. 通知生成が必要なAPIで `service.ts` を使用。
 2. `notifications` テーブルにINSERT。
-3. クライアント側で `/api/notifications` から取得。
+3. フロントは `/api/notifications` から取得。
 
-### 6.3 管理者操作
+### 9.3 管理者操作
 1. 管理者が `/api/admin/*` を実行。
-2. DB側RLSで `is_admin()` 判定を通過した場合のみ処理。
-3. `admin_actions` にログ記録。
+2. RLSの `is_admin()` 判定を通過した場合のみ処理。
+3. `admin_actions` にログを記録。
 
 ---
 
-本ドキュメントは、バックエンドAPIの構成とSupabaseの利用方式を理解しやすくするために作成しています。
+本ドキュメントは、バックエンドAPIの構成と「どこに何が書いてあるか」を理解しやすくするためのガイドです。
