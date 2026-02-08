@@ -169,6 +169,7 @@ export async function POST(request: NextRequest) {
             userHandle,
             displayName,
           },
+          emailConfirmationRequired: !authData.session,
         },
         status: 201,
       },

@@ -52,7 +52,11 @@ export default function SignupPage() {
         return;
       }
 
-      router.push("/verify");
+      if (result.data?.emailConfirmationRequired) {
+        router.push("/verify");
+      } else {
+        router.push("/home");
+      }
     } catch {
       setError("サーバーエラーが発生しました");
     }
