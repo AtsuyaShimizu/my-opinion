@@ -20,10 +20,10 @@ interface AdminUser {
 }
 
 const STATUS_LABELS: Record<string, { label: string; color: string }> = {
-  active: { label: "アクティブ", color: "bg-green-100 text-green-700" },
-  suspended: { label: "一時停止", color: "bg-amber-100 text-amber-700" },
-  banned: { label: "凍結", color: "bg-red-100 text-red-700" },
-  withdrawn: { label: "退会済み", color: "bg-gray-100 text-gray-700" },
+  active: { label: "アクティブ", color: "bg-emerald-50/80 text-emerald-700 dark:bg-emerald-950/30 dark:text-emerald-400" },
+  suspended: { label: "一時停止", color: "bg-amber-50/80 text-amber-700 dark:bg-amber-950/30 dark:text-amber-400" },
+  banned: { label: "凍結", color: "bg-red-50/80 text-red-700 dark:bg-red-950/30 dark:text-red-400" },
+  withdrawn: { label: "退会済み", color: "bg-muted text-muted-foreground" },
 };
 
 export default function AdminUsersPage() {

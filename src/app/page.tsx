@@ -46,14 +46,14 @@ export default function LandingPage() {
   return (
     <div className="min-h-screen bg-background">
       {/* Header */}
-      <header className="border-b">
-        <div className="mx-auto flex h-16 max-w-5xl items-center justify-between px-4">
-          <span className="text-xl font-bold text-primary">My Opinion</span>
-          <div className="flex items-center gap-3">
-            <Button variant="ghost" asChild>
+      <header className="border-b bg-background/80 backdrop-blur-sm">
+        <div className="mx-auto flex h-14 max-w-5xl items-center justify-between px-4">
+          <span className="text-lg font-bold tracking-tight text-primary">My Opinion</span>
+          <div className="flex items-center gap-2">
+            <Button variant="ghost" size="sm" asChild>
               <Link href="/login">ログイン</Link>
             </Button>
-            <Button asChild>
+            <Button size="sm" asChild>
               <Link href="/signup">新規登録</Link>
             </Button>
           </div>
@@ -61,18 +61,25 @@ export default function LandingPage() {
       </header>
 
       {/* Hero */}
-      <section className="px-4 py-20 text-center lg:py-32">
-        <div className="mx-auto max-w-3xl">
-          <h1 className="text-4xl font-bold tracking-tight lg:text-5xl">
+      <section className="relative overflow-hidden px-4 py-24 text-center lg:py-36">
+        {/* Background glow */}
+        <div className="pointer-events-none absolute inset-0 overflow-hidden">
+          <div className="absolute left-1/2 top-1/3 h-[400px] w-[600px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-primary/8 blur-[100px]" />
+        </div>
+        <div className="relative mx-auto max-w-2xl">
+          <p className="mb-4 text-xs font-medium uppercase tracking-widest text-muted-foreground">
+            属性開示型ソーシャルプラットフォーム
+          </p>
+          <h1 className="text-3xl font-bold tracking-tight lg:text-5xl">
             属性を開示して、
             <br />
-            <span className="text-primary">本質的な議論</span>を。
+            <span className="bg-gradient-to-r from-primary to-primary/70 bg-clip-text text-transparent">本質的な議論</span>を。
           </h1>
-          <p className="mx-auto mt-6 max-w-xl text-lg text-muted-foreground">
+          <p className="mx-auto mt-6 max-w-lg text-base leading-relaxed text-muted-foreground">
             エコーチェンバーに閉じた社会を変える。属性の可視化と反応の分析で、自分の立ち位置を理解し、多様な視点と出会えるSNS。
           </p>
-          <div className="mt-8 flex flex-col items-center gap-4 sm:flex-row sm:justify-center">
-            <Button size="lg" className="gap-2" asChild>
+          <div className="mt-10 flex flex-col items-center gap-3 sm:flex-row sm:justify-center">
+            <Button size="lg" className="gap-2 px-8" asChild>
               <Link href="/signup">
                 無料で始める
                 <ArrowRight className="h-4 w-4" />
@@ -86,19 +93,22 @@ export default function LandingPage() {
       </section>
 
       {/* Features */}
-      <section className="border-t bg-muted/30 px-4 py-20">
+      <section className="border-t bg-muted/30 px-4 py-24">
         <div className="mx-auto max-w-5xl">
-          <h2 className="text-center text-2xl font-bold lg:text-3xl">
+          <p className="text-center text-xs font-medium uppercase tracking-widest text-muted-foreground">Features</p>
+          <h2 className="mt-2 text-center text-2xl font-bold lg:text-3xl">
             My Opinion の特徴
           </h2>
-          <div className="mt-12 grid gap-8 sm:grid-cols-2 lg:grid-cols-3">
+          <div className="mt-14 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
             {features.map((feature) => (
               <div
                 key={feature.title}
-                className="rounded-lg border bg-card p-6"
+                className="rounded-lg border bg-card p-6 transition-all duration-200 hover:-translate-y-1 hover:shadow-md hover:bg-accent/30"
               >
-                <feature.icon className="h-8 w-8 text-primary" />
-                <h3 className="mt-4 text-lg font-semibold">{feature.title}</h3>
+                <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10">
+                  <feature.icon className="h-5 w-5 text-primary" />
+                </div>
+                <h3 className="mt-4 text-base font-semibold">{feature.title}</h3>
                 <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
                   {feature.description}
                 </p>
@@ -109,15 +119,15 @@ export default function LandingPage() {
       </section>
 
       {/* CTA */}
-      <section className="px-4 py-20 text-center">
-        <div className="mx-auto max-w-2xl">
+      <section className="px-4 py-24 text-center">
+        <div className="mx-auto max-w-md">
           <h2 className="text-2xl font-bold lg:text-3xl">
             エコーチェンバーから抜け出そう
           </h2>
-          <p className="mt-4 text-muted-foreground">
+          <p className="mt-4 text-sm leading-relaxed text-muted-foreground">
             招待制のため、招待コードをお持ちの方のみ登録できます。
           </p>
-          <Button size="lg" className="mt-8 gap-2" asChild>
+          <Button size="lg" className="mt-8 gap-2 px-8" asChild>
             <Link href="/signup">
               招待コードで登録する
               <ArrowRight className="h-4 w-4" />
@@ -128,8 +138,8 @@ export default function LandingPage() {
 
       {/* Footer */}
       <footer className="border-t">
-        <div className="mx-auto flex max-w-5xl flex-col items-center gap-4 px-4 py-8 text-sm text-muted-foreground sm:flex-row sm:justify-between">
-          <span>My Opinion</span>
+        <div className="mx-auto flex max-w-5xl flex-col items-center gap-4 px-4 py-8 text-xs text-muted-foreground sm:flex-row sm:justify-between">
+          <span className="font-medium">My Opinion</span>
           <div className="flex gap-6">
             <Link href="/terms" className="transition-colors hover:text-foreground">
               利用規約

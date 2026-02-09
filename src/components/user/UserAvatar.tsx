@@ -1,12 +1,20 @@
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { cn } from "@/lib/utils";
 
-type UserAvatarSize = "sm" | "md" | "lg";
+type UserAvatarSize = "xs" | "sm" | "md" | "lg";
 
 const sizeClasses: Record<UserAvatarSize, string> = {
+  xs: "h-6 w-6",
   sm: "h-8 w-8",
   md: "h-10 w-10",
-  lg: "h-16 w-16",
+  lg: "h-20 w-20",
+};
+
+const fallbackTextSize: Record<UserAvatarSize, string> = {
+  xs: "text-[10px]",
+  sm: "text-xs",
+  md: "text-sm",
+  lg: "text-xl",
 };
 
 interface UserAvatarProps {
@@ -25,9 +33,14 @@ export function UserAvatar({
   const initials = displayName.slice(0, 2);
 
   return (
-    <Avatar className={cn(sizeClasses[size], className)}>
+    <Avatar className={cn(sizeClasses[size], "ring-2 ring-background", className)}>
       {src && <AvatarImage src={src} alt={displayName} />}
-      <AvatarFallback className="bg-primary/10 text-primary text-sm font-medium">
+      <AvatarFallback
+        className={cn(
+          "bg-primary/10 text-primary font-medium",
+          fallbackTextSize[size]
+        )}
+      >
         {initials}
       </AvatarFallback>
     </Avatar>

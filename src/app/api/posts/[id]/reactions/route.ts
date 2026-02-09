@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 
-// POST /api/posts/:id/reactions - Add reaction (Good/Bad)
+// POST /api/posts/:id/reactions - Add or update reaction score (0-100)
 export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -22,19 +22,24 @@ export async function POST(
     }
 
     const body = await request.json();
-    const reactionType = body.reactionType;
+    const reactionScore = body.reactionScore;
 
-    if (reactionType !== "good" && reactionType !== "bad") {
+    if (
+      typeof reactionScore !== "number" ||
+      !Number.isInteger(reactionScore) ||
+      reactionScore < 0 ||
+      reactionScore > 100
+    ) {
       return NextResponse.json(
-        { error: "reactionType は good または bad を指定してください", status: 400 },
+        { error: "reactionScore は 0 以上 100 以下の整数を指定してください", status: 400 },
         { status: 400 }
       );
     }
 
-    // Verify post exists
+    // Verify post exists and check ownership
     const { data: post } = await supabase
       .from("posts")
-      .select("id")
+      .select("id, user_id")
       .eq("id", postId)
       .single();
 
@@ -42,6 +47,14 @@ export async function POST(
       return NextResponse.json(
         { error: "投稿が見つかりません", status: 404 },
         { status: 404 }
+      );
+    }
+
+    // Prevent self-reaction
+    if (post.user_id === user.id) {
+      return NextResponse.json(
+        { error: "自分の投稿には評価できません", status: 403 },
+        { status: 403 }
       );
     }
 
@@ -55,22 +68,16 @@ export async function POST(
     // Check if user already reacted
     const { data: existingReaction } = await supabase
       .from("reactions")
-      .select("id, reaction_type")
+      .select("id")
       .eq("user_id", user.id)
       .eq("post_id", postId)
       .single();
 
     if (existingReaction) {
-      if (existingReaction.reaction_type === reactionType) {
-        return NextResponse.json(
-          { error: "既に同じ評価をしています", status: 409 },
-          { status: 409 }
-        );
-      }
-      // Switch reaction type
+      // Update existing reaction score
       const { error } = await supabase
         .from("reactions")
-        .update({ reaction_type: reactionType })
+        .update({ reaction_score: reactionScore })
         .eq("id", existingReaction.id);
 
       if (error) {
@@ -81,7 +88,7 @@ export async function POST(
       }
 
       return NextResponse.json({
-        data: { message: "評価を更新しました", reactionType },
+        data: { message: "評価を更新しました", reactionScore },
         status: 200,
       });
     }
@@ -90,7 +97,7 @@ export async function POST(
     const { error } = await supabase.from("reactions").insert({
       user_id: user.id,
       post_id: postId,
-      reaction_type: reactionType,
+      reaction_score: reactionScore,
       reactor_attribute_snapshot: attributes ?? undefined,
     });
 
@@ -102,7 +109,7 @@ export async function POST(
     }
 
     return NextResponse.json(
-      { data: { message: "評価しました", reactionType }, status: 201 },
+      { data: { message: "評価しました", reactionScore }, status: 201 },
       { status: 201 }
     );
   } catch {

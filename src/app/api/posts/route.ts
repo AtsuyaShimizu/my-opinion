@@ -27,13 +27,17 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const { content, themeId } = parsed.data;
+    const { title, content, themeId } = parsed.data;
+
+    // Normalize title: empty string -> null
+    const normalizedTitle = title?.trim() || null;
 
     // Create post
     const { data: post, error: postError } = await supabase
       .from("posts")
       .insert({
         user_id: user.id,
+        title: normalizedTitle,
         content,
       })
       .select()

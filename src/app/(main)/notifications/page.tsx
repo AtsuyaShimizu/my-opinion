@@ -3,23 +3,24 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import {
-  Loader2,
   Bell,
   MessageCircle,
   UserPlus,
-  ThumbsUp,
+  SlidersHorizontal,
   BarChart3,
   MessageSquare,
 } from "lucide-react";
+import { PostCardSkeleton } from "@/components/post/PostCardSkeleton";
 import { EmptyState } from "@/components/common/EmptyState";
 import { UserAvatar } from "@/components/user/UserAvatar";
 import { Button } from "@/components/ui/button";
 import { apiFetch } from "@/lib/api/client";
 import { cn } from "@/lib/utils";
+import { formatRelativeTime } from "@/lib/utils/formatTime";
 
 interface NotificationItem {
   id: string;
-  type: "reply" | "follow" | "good" | "theme_start" | "analysis_ready";
+  type: "reply" | "follow" | "reaction" | "theme_start" | "analysis_ready";
   message: string;
   is_read: boolean;
   created_at: string;
@@ -34,15 +35,21 @@ interface NotificationItem {
 const notificationIcons = {
   reply: MessageCircle,
   follow: UserPlus,
-  good: ThumbsUp,
+  reaction: SlidersHorizontal,
   theme_start: MessageSquare,
   analysis_ready: BarChart3,
 };
 
+/** Extract reaction score from message like "あなたの意見に 78 で評価しました" */
+function extractReactionScore(message: string): number | null {
+  const match = message.match(/(\d+)\s*で評価/);
+  return match ? parseInt(match[1], 10) : null;
+}
+
 function getNotificationLink(n: NotificationItem): string {
   switch (n.type) {
     case "reply":
-    case "good":
+    case "reaction":
       return n.reference_id ? `/posts/${n.reference_id}` : "#";
     case "follow":
       return n.actor ? `/users/${n.actor.handle}` : "#";
@@ -55,27 +62,13 @@ function getNotificationLink(n: NotificationItem): string {
   }
 }
 
-function formatTime(dateStr: string): string {
-  const now = new Date();
-  const date = new Date(dateStr);
-  const diff = now.getTime() - date.getTime();
-  const minutes = Math.floor(diff / 60000);
-  const hours = Math.floor(minutes / 60);
-  const days = Math.floor(hours / 24);
-
-  if (days > 0) return `${days}日前`;
-  if (hours > 0) return `${hours}時間前`;
-  if (minutes > 0) return `${minutes}分前`;
-  return "たった今";
-}
-
 export default function NotificationsPage() {
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    apiFetch<{ notifications: NotificationItem[]; nextCursor: string | null }>("/api/notifications")
-      .then((data) => setNotifications(data.notifications ?? []))
+    apiFetch<{ items: NotificationItem[]; nextCursor: string | null }>("/api/notifications")
+      .then((data) => setNotifications(data.items ?? []))
       .catch(() => setNotifications([]))
       .finally(() => setLoading(false));
   }, []);
@@ -91,16 +84,23 @@ export default function NotificationsPage() {
 
   if (loading) {
     return (
-      <div className="flex justify-center py-16">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      <div>
+        <div className="sticky top-14 z-40 border-b bg-background/95 px-4 py-3 backdrop-blur lg:top-0">
+          <h1 className="text-xl font-bold">通知</h1>
+        </div>
+        <div>
+          {Array.from({ length: 5 }).map((_, i) => (
+            <PostCardSkeleton key={i} />
+          ))}
+        </div>
       </div>
     );
   }
 
   return (
-    <div>
+    <div className="animate-fade-in-up">
       <div className="sticky top-14 z-40 flex items-center justify-between border-b bg-background/95 px-4 py-3 backdrop-blur lg:top-0">
-        <h1 className="text-lg font-bold">通知</h1>
+        <h1 className="text-xl font-bold">通知</h1>
         {notifications.some((n) => !n.is_read) && (
           <Button variant="ghost" size="sm" onClick={markAllRead}>
             すべて既読
@@ -118,39 +118,45 @@ export default function NotificationsPage() {
         <div className="divide-y">
           {notifications.map((n) => {
             const Icon = notificationIcons[n.type];
+            const reactionScore = n.type === "reaction" ? extractReactionScore(n.message) : null;
             return (
               <Link
                 key={n.id}
                 href={getNotificationLink(n)}
                 className={cn(
-                  "flex items-start gap-3 px-4 py-4 transition-colors hover:bg-accent/50",
-                  !n.is_read && "bg-primary/5"
+                  "flex items-start gap-3 px-4 py-4 transition-colors hover:bg-accent/40",
+                  !n.is_read && "border-l-2 border-l-primary bg-primary/[0.06]"
                 )}
               >
-                {n.actor ? (
+                {/* Show score badge for reaction notifications, avatar for actor-based, icon fallback */}
+                {reactionScore !== null ? (
+                  <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary/10">
+                    <span className="text-sm font-bold tabular-nums text-primary">{reactionScore}</span>
+                  </div>
+                ) : n.actor ? (
                   <UserAvatar
                     src={n.actor.avatar_url}
                     displayName={n.actor.display_name}
                     size="sm"
                   />
                 ) : (
-                  <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary/10">
-                    <Icon className="h-4 w-4 text-primary" />
+                  <div className="flex h-8 w-8 items-center justify-center rounded-full bg-muted">
+                    <Icon className="h-4 w-4 text-muted-foreground" />
                   </div>
                 )}
                 <div className="min-w-0 flex-1">
-                  <p className="text-sm">
+                  <p className={cn("text-sm", !n.is_read && "font-medium")}>
                     {n.actor && (
                       <span className="font-semibold">{n.actor.display_name}</span>
                     )}{" "}
                     {n.message}
                   </p>
-                  <p className="mt-1 text-xs text-muted-foreground">
-                    {formatTime(n.created_at)}
+                  <p className="mt-1 text-xs text-muted-foreground/70">
+                    {formatRelativeTime(n.created_at)}
                   </p>
                 </div>
                 {!n.is_read && (
-                  <div className="mt-2 h-2 w-2 shrink-0 rounded-full bg-primary" />
+                  <div className="mt-2 h-2 w-2 shrink-0 rounded-full bg-primary animate-unread-pulse" />
                 )}
               </Link>
             );

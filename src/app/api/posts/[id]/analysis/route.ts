@@ -51,7 +51,7 @@ export async function GET(
     // Get all reactions for this post
     const { data: reactions } = await supabase
       .from("reactions")
-      .select("reaction_type, reactor_attribute_snapshot")
+      .select("reaction_score, reactor_attribute_snapshot")
       .eq("post_id", postId);
 
     const totalReactions = reactions?.length ?? 0;
@@ -68,11 +68,27 @@ export async function GET(
       });
     }
 
-    // Calculate Good/Bad ratio
-    const goodCount = reactions!.filter((r) => r.reaction_type === "good").length;
-    const badCount = totalReactions - goodCount;
+    // Calculate overall score stats
+    const scores = reactions!.map((r) => r.reaction_score);
+    const averageScore = Math.round(scores.reduce((a, b) => a + b, 0) / totalReactions);
 
-    // Build attribute distributions and cross-tabulations
+    // Score distribution in 5 bins: 0-20, 21-40, 41-60, 61-80, 81-100
+    const scoreDistribution = [
+      { range: "0-20", count: 0 },
+      { range: "21-40", count: 0 },
+      { range: "41-60", count: 0 },
+      { range: "61-80", count: 0 },
+      { range: "81-100", count: 0 },
+    ];
+    for (const score of scores) {
+      if (score <= 20) scoreDistribution[0].count++;
+      else if (score <= 40) scoreDistribution[1].count++;
+      else if (score <= 60) scoreDistribution[2].count++;
+      else if (score <= 80) scoreDistribution[3].count++;
+      else scoreDistribution[4].count++;
+    }
+
+    // Build attribute distributions and cross-tabulations (score-based)
     const attributeKeys: AttributeKey[] = [
       "gender",
       "age_range",
@@ -85,7 +101,7 @@ export async function GET(
     const attributeDistribution: Record<string, Record<string, number>> = {};
     const crossTabulation: Record<
       string,
-      Record<string, { good: number; bad: number }>
+      Record<string, { count: number; totalScore: number; averageScore: number }>
     > = {};
 
     for (const key of attributeKeys) {
@@ -106,23 +122,20 @@ export async function GET(
         attributeDistribution[key][strValue] =
           (attributeDistribution[key][strValue] ?? 0) + 1;
 
-        // Cross-tabulation
+        // Cross-tabulation (score-based)
         if (!crossTabulation[key][strValue]) {
-          crossTabulation[key][strValue] = { good: 0, bad: 0 };
+          crossTabulation[key][strValue] = { count: 0, totalScore: 0, averageScore: 0 };
         }
-        if (reaction.reaction_type === "good") {
-          crossTabulation[key][strValue].good++;
-        } else {
-          crossTabulation[key][strValue].bad++;
-        }
+        crossTabulation[key][strValue].count++;
+        crossTabulation[key][strValue].totalScore += reaction.reaction_score;
       }
     }
 
-    // Apply k-anonymization: hide cells with fewer than MIN_CELL_SIZE
+    // Calculate averages and apply k-anonymization
     const filteredDistribution: Record<string, Record<string, number>> = {};
     const filteredCrossTab: Record<
       string,
-      Record<string, { good: number; bad: number }>
+      Record<string, { count: number; averageScore: number }>
     > = {};
 
     for (const key of attributeKeys) {
@@ -132,7 +145,11 @@ export async function GET(
       for (const [value, count] of Object.entries(attributeDistribution[key])) {
         if (count >= MIN_CELL_SIZE) {
           filteredDistribution[key][value] = count;
-          filteredCrossTab[key][value] = crossTabulation[key][value];
+          const ct = crossTabulation[key][value];
+          filteredCrossTab[key][value] = {
+            count: ct.count,
+            averageScore: Math.round(ct.totalScore / ct.count),
+          };
         }
       }
     }
@@ -141,12 +158,8 @@ export async function GET(
       data: {
         available: true,
         totalReactions,
-        goodBadRatio: {
-          good: goodCount,
-          bad: badCount,
-          goodRate: Math.round((goodCount / totalReactions) * 100),
-          badRate: Math.round((badCount / totalReactions) * 100),
-        },
+        averageScore,
+        scoreDistribution,
         attributeDistribution: filteredDistribution,
         crossTabulation: filteredCrossTab,
       },

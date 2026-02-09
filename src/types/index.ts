@@ -9,7 +9,6 @@ export type {
   Occupation,
   PoliticalParty,
   PoliticalStance,
-  ReactionType,
   ReportReason,
   ReportStatus,
   ThemeStatus,

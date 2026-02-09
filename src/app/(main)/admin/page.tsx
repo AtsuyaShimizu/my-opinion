@@ -18,13 +18,15 @@ interface AdminStats {
 
 function StatCard({ label, value, icon: Icon, href }: { label: string; value: number; icon: React.ElementType; href?: string }) {
   const content = (
-    <div className="rounded-lg border p-4 transition-colors hover:bg-accent/50">
+    <div className="rounded-lg border bg-card p-4 transition-colors hover:bg-accent/40">
       <div className="flex items-center justify-between">
-        <Icon className="h-5 w-5 text-muted-foreground" />
-        {href && <span className="text-xs text-primary">詳細</span>}
+        <div className="flex h-8 w-8 items-center justify-center rounded-md bg-muted">
+          <Icon className="h-4 w-4 text-muted-foreground" />
+        </div>
+        {href && <span className="text-[11px] font-medium text-primary">詳細</span>}
       </div>
-      <p className="mt-3 text-2xl font-bold">{value.toLocaleString()}</p>
-      <p className="text-sm text-muted-foreground">{label}</p>
+      <p className="mt-3 text-2xl font-bold tracking-tight">{value.toLocaleString()}</p>
+      <p className="text-xs text-muted-foreground">{label}</p>
     </div>
   );
   if (href) return <Link href={href}>{content}</Link>;
@@ -78,7 +80,7 @@ export default function AdminDashboardPage() {
         </div>
 
         <div>
-          <h2 className="mb-3 font-semibold">今日のアクティビティ</h2>
+          <h2 className="mb-3 text-xs font-medium uppercase tracking-wider text-muted-foreground">今日のアクティビティ</h2>
           <div className="grid grid-cols-2 gap-3">
             <StatCard label="新規投稿" value={stats.postsToday} icon={MessageSquare} />
             <StatCard label="新規ユーザー" value={stats.newUsersToday} icon={UserPlus} />
@@ -86,31 +88,39 @@ export default function AdminDashboardPage() {
         </div>
 
         <div>
-          <h2 className="mb-3 font-semibold">管理メニュー</h2>
-          <div className="space-y-2">
-            <Link href="/admin/users" className="flex items-center gap-3 rounded-lg border px-4 py-3 transition-colors hover:bg-accent/50">
-              <Users className="h-5 w-5 text-muted-foreground" />
+          <h2 className="mb-3 text-xs font-medium uppercase tracking-wider text-muted-foreground">管理メニュー</h2>
+          <div className="space-y-1.5">
+            <Link href="/admin/users" className="flex items-center gap-3 rounded-lg border bg-card px-4 py-3 transition-colors hover:bg-accent/40">
+              <div className="flex h-8 w-8 items-center justify-center rounded-md bg-muted">
+                <Users className="h-4 w-4 text-muted-foreground" />
+              </div>
               <div>
                 <p className="text-sm font-medium">ユーザー管理</p>
                 <p className="text-xs text-muted-foreground">ユーザーの検索、ステータス変更</p>
               </div>
             </Link>
-            <Link href="/admin/reports" className="flex items-center gap-3 rounded-lg border px-4 py-3 transition-colors hover:bg-accent/50">
-              <AlertTriangle className="h-5 w-5 text-muted-foreground" />
+            <Link href="/admin/reports" className="flex items-center gap-3 rounded-lg border bg-card px-4 py-3 transition-colors hover:bg-accent/40">
+              <div className="flex h-8 w-8 items-center justify-center rounded-md bg-muted">
+                <AlertTriangle className="h-4 w-4 text-muted-foreground" />
+              </div>
               <div>
                 <p className="text-sm font-medium">通報管理</p>
                 <p className="text-xs text-muted-foreground">通報の確認、対応</p>
               </div>
             </Link>
-            <Link href="/admin/themes" className="flex items-center gap-3 rounded-lg border px-4 py-3 transition-colors hover:bg-accent/50">
-              <MessageSquare className="h-5 w-5 text-muted-foreground" />
+            <Link href="/admin/themes" className="flex items-center gap-3 rounded-lg border bg-card px-4 py-3 transition-colors hover:bg-accent/40">
+              <div className="flex h-8 w-8 items-center justify-center rounded-md bg-muted">
+                <MessageSquare className="h-4 w-4 text-muted-foreground" />
+              </div>
               <div>
-                <p className="text-sm font-medium">テーマ管理</p>
-                <p className="text-xs text-muted-foreground">テーマの作成、編集、終了</p>
+                <p className="text-sm font-medium">トピック管理</p>
+                <p className="text-xs text-muted-foreground">トピックの作成、編集、終了</p>
               </div>
             </Link>
-            <Link href="/admin/invites" className="flex items-center gap-3 rounded-lg border px-4 py-3 transition-colors hover:bg-accent/50">
-              <FileText className="h-5 w-5 text-muted-foreground" />
+            <Link href="/admin/invites" className="flex items-center gap-3 rounded-lg border bg-card px-4 py-3 transition-colors hover:bg-accent/40">
+              <div className="flex h-8 w-8 items-center justify-center rounded-md bg-muted">
+                <FileText className="h-4 w-4 text-muted-foreground" />
+              </div>
               <div>
                 <p className="text-sm font-medium">招待コード管理</p>
                 <p className="text-xs text-muted-foreground">招待コードの一括生成</p>

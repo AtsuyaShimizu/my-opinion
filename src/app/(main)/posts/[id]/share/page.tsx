@@ -10,12 +10,7 @@ import { apiFetch } from "@/lib/api/client";
 interface AnalysisData {
   available: boolean;
   totalReactions: number;
-  goodBadRatio?: {
-    good: number;
-    bad: number;
-    goodRate: number;
-    badRate: number;
-  };
+  averageScore?: number;
 }
 
 export default function SharePage({
@@ -41,8 +36,8 @@ export default function SharePage({
     : "";
 
   function handleShareX() {
-    if (!data?.goodBadRatio) return;
-    const text = `My Opinionでの投稿分析結果: Good ${data.goodBadRatio.goodRate}% / Bad ${data.goodBadRatio.badRate}% (${data.totalReactions}件の評価)`;
+    if (!data?.averageScore) return;
+    const text = `My Opinionでの分析結果: 平均スコア ${data.averageScore} (${data.totalReactions}件のリアクション)`;
     const url = `https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}&url=${encodeURIComponent(shareUrl)}`;
     window.open(url, "_blank", "noopener,noreferrer");
   }
@@ -83,28 +78,19 @@ export default function SharePage({
 
       <div className="space-y-6 px-4 py-6">
         {/* Analysis Summary Card */}
-        <div className="rounded-lg border bg-gradient-to-br from-blue-50 to-white p-6">
+        <div className="rounded-lg border bg-gradient-to-br from-primary/5 to-card p-6">
           <div className="text-center">
             <p className="text-sm font-medium text-muted-foreground">
               My Opinion 分析レポート
             </p>
-            <div className="mt-4 flex items-center justify-center gap-8">
-              <div>
-                <p className="text-3xl font-bold text-blue-600">
-                  {data.goodBadRatio!.goodRate}%
-                </p>
-                <p className="text-sm text-muted-foreground">Good</p>
-              </div>
-              <div className="h-12 w-px bg-border" />
-              <div>
-                <p className="text-3xl font-bold text-red-500">
-                  {data.goodBadRatio!.badRate}%
-                </p>
-                <p className="text-sm text-muted-foreground">Bad</p>
-              </div>
+            <div className="mt-4">
+              <p className="text-5xl font-bold tracking-tight text-primary">
+                {data.averageScore}
+              </p>
+              <p className="mt-1 text-sm text-muted-foreground">平均スコア</p>
             </div>
             <p className="mt-4 text-xs text-muted-foreground">
-              {data.totalReactions} 件の評価に基づく
+              {data.totalReactions} 件のリアクションに基づく
             </p>
           </div>
         </div>
@@ -121,7 +107,7 @@ export default function SharePage({
             className="w-full gap-2"
           >
             {copied ? (
-              <Check className="h-4 w-4 text-green-600" />
+              <Check className="h-4 w-4 text-primary" />
             ) : (
               <Copy className="h-4 w-4" />
             )}

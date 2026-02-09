@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { extractPublicAttributes } from "@/lib/utils/attributes";
 
 // GET /api/posts/:id - Get post detail
 export async function GET(
@@ -37,30 +38,18 @@ export async function GET(
       .eq("user_id", post.user_id)
       .single();
 
-    const publicAttributes = attributes
-      ? {
-          gender: attributes.is_gender_public ? attributes.gender : null,
-          age_range: attributes.is_age_range_public ? attributes.age_range : null,
-          education: attributes.is_education_public ? attributes.education : null,
-          occupation: attributes.is_occupation_public ? attributes.occupation : null,
-          political_party: attributes.is_political_party_public ? attributes.political_party : null,
-          political_stance: attributes.is_political_stance_public ? attributes.political_stance : null,
-        }
-      : null;
+    const publicAttributes = extractPublicAttributes(attributes);
 
-    // Get reaction counts
-    const [{ count: goodCount }, { count: badCount }] = await Promise.all([
-      supabase
-        .from("reactions")
-        .select("*", { count: "exact", head: true })
-        .eq("post_id", id)
-        .eq("reaction_type", "good"),
-      supabase
-        .from("reactions")
-        .select("*", { count: "exact", head: true })
-        .eq("post_id", id)
-        .eq("reaction_type", "bad"),
-    ]);
+    // Get reactions for score calculation
+    const { data: reactions } = await supabase
+      .from("reactions")
+      .select("reaction_score")
+      .eq("post_id", id);
+
+    const reactionCount = reactions?.length ?? 0;
+    const averageScore = reactionCount > 0
+      ? Math.round((reactions!.reduce((sum, r) => sum + r.reaction_score, 0) / reactionCount))
+      : null;
 
     // Get reply count
     const { count: replyCount } = await supabase
@@ -73,18 +62,16 @@ export async function GET(
       data: { user: currentUser },
     } = await supabase.auth.getUser();
 
-    let currentUserReaction: string | null = null;
-    let showBadCount = false;
+    let currentUserScore: number | null = null;
 
     if (currentUser) {
       const { data: reaction } = await supabase
         .from("reactions")
-        .select("reaction_type")
+        .select("reaction_score")
         .eq("post_id", id)
         .eq("user_id", currentUser.id)
         .single();
-      currentUserReaction = reaction?.reaction_type ?? null;
-      showBadCount = currentUser.id === post.user_id;
+      currentUserScore = reaction?.reaction_score ?? null;
     }
 
     // Get repost origin if this is a repost
@@ -110,10 +97,10 @@ export async function GET(
       data: {
         ...post,
         author: { ...author, attributes: publicAttributes },
-        goodCount: goodCount ?? 0,
-        badCount: showBadCount ? (badCount ?? 0) : undefined,
+        reactionCount,
+        averageScore,
         replyCount: replyCount ?? 0,
-        currentUserReaction,
+        currentUserScore,
         repostOf,
       },
       status: 200,

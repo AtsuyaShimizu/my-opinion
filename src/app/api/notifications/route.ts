@@ -45,7 +45,7 @@ export async function GET(request: NextRequest) {
     const nextCursor = hasMore ? items[items.length - 1].created_at : null;
 
     return NextResponse.json({
-      data: { notifications: items, nextCursor, hasMore },
+      data: { items, nextCursor, hasMore },
       status: 200,
     });
   } catch {

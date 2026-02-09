@@ -32,8 +32,8 @@ CREATE INDEX idx_reactions_post_id ON reactions (post_id);
 -- ユーザー別の評価一覧
 CREATE INDEX idx_reactions_user_id ON reactions (user_id);
 
--- 投稿ごとの評価タイプ別集計（Good数/Bad数のカウント）
-CREATE INDEX idx_reactions_post_id_type ON reactions (post_id, reaction_type);
+-- 投稿ごとのスコア別集計
+CREATE INDEX idx_reactions_post_id_score ON reactions (post_id, reaction_score);
 
 -- =============================================================
 -- follows

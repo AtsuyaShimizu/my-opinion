@@ -1,16 +1,23 @@
 "use client";
 
 import { useState, useEffect, useCallback, use } from "react";
-import { Loader2 } from "lucide-react";
 import Link from "next/link";
 import { UserAvatar } from "@/components/user/UserAvatar";
-import { AttributeBadge } from "@/components/user/AttributeBadge";
-import { PostCard } from "@/components/post/PostCard";
+import { AttributePanel } from "@/components/user/AttributePanel";
+import { PositionMap } from "@/components/user/PositionMap";
+import { OpinionTile } from "@/components/post/OpinionTile";
+import { PostCardSkeleton } from "@/components/post/PostCardSkeleton";
 import { EmptyState } from "@/components/common/EmptyState";
 import { InfiniteScroll } from "@/components/common/InfiniteScroll";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
-import { Separator } from "@/components/ui/separator";
 import { apiFetch } from "@/lib/api/client";
+import { cn } from "@/lib/utils";
+import { mapAttributes } from "@/lib/utils/mapAttributes";
+import { useAuth } from "@/hooks/useAuth";
+import { useReactionHandler } from "@/hooks/useReactionHandler";
+import { ATTRIBUTE_LABELS } from "@/lib/constants";
+import { toast } from "sonner";
 
 interface UserProfile {
   id: string;
@@ -34,14 +41,15 @@ interface UserProfile {
 
 interface UserPost {
   id: string;
+  title?: string | null;
   content: string;
   created_at: string;
   user_id: string;
-  goodCount: number;
-  badCount?: number;
+  reactionCount: number;
+  averageScore: number | null;
   replyCount: number;
   repostCount: number;
-  currentUserReaction: "good" | "bad" | null;
+  currentUserScore: number | null;
   author: {
     user_handle: string;
     display_name: string;
@@ -50,24 +58,38 @@ interface UserPost {
   } | null;
 }
 
-const ATTRIBUTE_LABELS: Record<string, Record<string, string>> = {
-  gender: { male: "男性", female: "女性", other: "その他", no_answer: "回答しない" },
-  age_range: { "18-24": "18-24歳", "25-29": "25-29歳", "30-34": "30-34歳", "35-39": "35-39歳", "40-44": "40-44歳", "45-49": "45-49歳", "50-54": "50-54歳", "55-59": "55-59歳", "60-64": "60-64歳", "65_and_over": "65歳以上" },
-  education: { junior_high: "中学校卒", high_school: "高校卒", vocational: "専門学校卒", junior_college: "短大卒", university: "大学卒", masters: "大学院卒（修士）", doctorate: "大学院卒（博士）", other: "その他" },
-  occupation: { company_employee: "会社員", civil_servant: "公務員", self_employed: "自営業", executive: "経営者", professional: "専門職", educator_researcher: "教育・研究職", student: "学生", homemaker: "主婦・主夫", part_time: "パート・アルバイト", unemployed: "無職", retired: "退職者", other: "その他" },
-  political_party: { ldp: "自由民主党", cdp: "立憲民主党", nippon_ishin: "日本維新の会", komeito: "公明党", dpfp: "国民民主党", jcp: "日本共産党", reiwa: "れいわ新選組", sdp: "社会民主党", sanseito: "参政党", other: "その他", no_party: "支持政党なし", no_answer: "回答しない" },
-  political_stance: { left: "左派", center_left: "やや左派", center: "中道", center_right: "やや右派", right: "右派" },
-};
-
-function mapAttributes(attrs: Record<string, string | null> | null) {
-  if (!attrs) return [];
-  const typeMap: Record<string, "gender" | "age_range" | "education" | "occupation" | "political_stance" | "political_party"> = {
-    gender: "gender", age_range: "age_range", education: "education",
-    occupation: "occupation", political_stance: "political_stance", political_party: "political_party",
-  };
-  return Object.entries(attrs)
-    .filter(([key, val]) => val != null && key in typeMap)
-    .map(([key, val]) => ({ type: typeMap[key], value: val as string }));
+function ProfileSkeleton() {
+  return (
+    <div>
+      <div className="px-4 py-6">
+        <div className="flex items-start gap-4">
+          <Skeleton className="h-16 w-16 rounded-full" />
+          <div className="flex-1 space-y-2 pt-1">
+            <Skeleton className="h-5 w-32" />
+            <Skeleton className="h-4 w-20" />
+          </div>
+          <Skeleton className="h-9 w-24 rounded-full" />
+        </div>
+        <div className="mt-4 space-y-2">
+          <Skeleton className="h-3 w-full" />
+          <Skeleton className="h-3 w-3/4" />
+        </div>
+        <div className="mt-4 grid grid-cols-3 gap-2">
+          <Skeleton className="h-16 rounded-xl" />
+          <Skeleton className="h-16 rounded-xl" />
+          <Skeleton className="h-16 rounded-xl" />
+        </div>
+        <div className="mt-4 flex gap-5">
+          <Skeleton className="h-4 w-20" />
+          <Skeleton className="h-4 w-20" />
+        </div>
+      </div>
+      <div className="border-t" />
+      {Array.from({ length: 3 }).map((_, i) => (
+        <PostCardSkeleton key={i} />
+      ))}
+    </div>
+  );
 }
 
 export default function UserProfilePage({
@@ -76,40 +98,60 @@ export default function UserProfilePage({
   params: Promise<{ handle: string }>;
 }) {
   const { handle } = use(params);
+  const { user } = useAuth();
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [posts, setPosts] = useState<UserPost[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const [hasMore, setHasMore] = useState(true);
   const [cursor, setCursor] = useState<string | null>(null);
+  const [followLoading, setFollowLoading] = useState(false);
+  const [positionData, setPositionData] = useState<{
+    axes: { themeTitle: string; score: number }[];
+    echoChamberScore: number | null;
+    message: string;
+  } | null>(null);
 
   const fetchProfile = useCallback(async () => {
     try {
       const data = await apiFetch<UserProfile>(`/api/users/${handle}`);
       setProfile(data);
     } catch {
-      // handle error
+      toast.error("プロフィールの取得に失敗しました");
     }
   }, [handle]);
 
-  // TODO: /api/users/${handle}/posts APIルートが未実装。バックエンドエンジニアが作成する必要がある。
   const fetchPosts = useCallback(async (cursorParam?: string | null) => {
     try {
       const url = cursorParam
         ? `/api/users/${handle}/posts?cursor=${cursorParam}`
         : `/api/users/${handle}/posts`;
-      const data = await apiFetch<{ posts: UserPost[]; nextCursor: string | null }>(url);
+      const data = await apiFetch<{ items: UserPost[]; nextCursor: string | null }>(url);
       if (cursorParam) {
-        setPosts((prev) => [...prev, ...data.posts]);
+        setPosts((prev) => [...prev, ...data.items]);
       } else {
-        setPosts(data.posts);
+        setPosts(data.items);
       }
       setCursor(data.nextCursor);
       setHasMore(!!data.nextCursor);
     } catch {
       setHasMore(false);
+      toast.error("投稿の取得に失敗しました");
     }
   }, [handle]);
+
+  const fetchPositionData = useCallback(async () => {
+    try {
+      const data = await apiFetch<{
+        axes: { themeTitle: string; score: number }[];
+        echoChamberScore: number | null;
+        message: string;
+      }>("/api/users/me/position-map");
+      setPositionData(data);
+    } catch {
+      // API may not exist yet
+    }
+  }, []);
 
   useEffect(() => {
     setLoading(true);
@@ -118,18 +160,50 @@ export default function UserProfilePage({
     );
   }, [fetchProfile, fetchPosts]);
 
-  // フォローAPIは /api/follows/[userId] (IDベース) を使用
+  // Fetch position data for own profile after profile loads
+  useEffect(() => {
+    if (profile?.isOwnProfile) {
+      fetchPositionData();
+    }
+  }, [profile?.isOwnProfile, fetchPositionData]);
+
+  // Listen for posts created from the right-side ComposePanel
+  useEffect(() => {
+    function handlePostCreated() {
+      fetchPosts();
+    }
+    window.addEventListener("post-created", handlePostCreated);
+    return () => window.removeEventListener("post-created", handlePostCreated);
+  }, [fetchPosts]);
+
+  const { handleReaction, handleReactionRemove } = useReactionHandler(setPosts, fetchPosts);
+
   async function handleFollow() {
-    if (!profile) return;
+    if (!profile || followLoading) return;
+    setFollowLoading(true);
+
+    // Optimistic update
+    setProfile((prev) =>
+      prev
+        ? {
+            ...prev,
+            isFollowing: !prev.isFollowing,
+            followerCount: prev.followerCount + (prev.isFollowing ? -1 : 1),
+          }
+        : prev
+    );
+
     try {
       if (profile.isFollowing) {
         await apiFetch(`/api/follows/${profile.id}`, { method: "DELETE" });
       } else {
         await apiFetch(`/api/follows/${profile.id}`, { method: "POST" });
       }
-      fetchProfile();
     } catch {
-      // handle error
+      fetchProfile();
+      toast.error("フォロー操作に失敗しました");
+    } finally {
+      setFollowLoading(false);
     }
   }
 
@@ -140,11 +214,7 @@ export default function UserProfilePage({
   }
 
   if (loading) {
-    return (
-      <div className="flex justify-center py-16">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
-      </div>
-    );
+    return <ProfileSkeleton />;
   }
 
   if (!profile) {
@@ -169,102 +239,135 @@ export default function UserProfilePage({
   }
 
   return (
-    <div>
+    <div className="animate-fade-in-up">
       {/* Profile Header */}
-      <div className="px-4 py-6">
-        <div className="flex items-start justify-between">
-          <UserAvatar
-            src={profile.avatar_url}
-            displayName={profile.display_name}
-            size="lg"
-          />
-          {profile.isOwnProfile ? (
-            <Button variant="outline" size="sm" asChild>
-              <Link href="/settings/profile">プロフィール編集</Link>
-            </Button>
-          ) : (
-            <Button
-              variant={profile.isFollowing ? "outline" : "default"}
-              size="sm"
-              onClick={handleFollow}
-            >
-              {profile.isFollowing ? "フォロー中" : "フォローする"}
-            </Button>
-          )}
-        </div>
+      <div className="relative">
+        {/* Subtle gradient banner */}
+        <div className="h-24 bg-gradient-to-br from-primary/10 via-primary/5 to-transparent" />
 
-        <div className="mt-4">
-          <h1 className="text-xl font-bold">{profile.display_name}</h1>
-          <p className="text-sm text-muted-foreground">@{profile.user_handle}</p>
-        </div>
-
-        {profile.bio && (
-          <p className="mt-3 text-sm leading-relaxed">{profile.bio}</p>
-        )}
-
-        {publicAttrs.length > 0 && (
-          <div className="mt-3 flex flex-wrap gap-1">
-            {publicAttrs.map((attr) => (
-              <AttributeBadge
-                key={attr.type}
-                type={attr.type}
-                value={attr.value}
+        <div className="px-4 pb-5">
+          {/* Avatar overlaps banner */}
+          <div className="-mt-10 flex items-end justify-between">
+            <div className="rounded-full border-4 border-background bg-background">
+              <UserAvatar
+                src={profile.avatar_url}
+                displayName={profile.display_name}
+                size="lg"
               />
-            ))}
+            </div>
+            {profile.isOwnProfile ? (
+              <Button variant="outline" size="sm" className="rounded-full" asChild>
+                <Link href="/settings/profile">プロフィールを編集</Link>
+              </Button>
+            ) : (
+              <Button
+                variant={profile.isFollowing ? "outline" : "default"}
+                size="sm"
+                className={cn(
+                  "rounded-full min-w-[100px] transition-all duration-200",
+                  profile.isFollowing && "hover:border-destructive hover:text-destructive"
+                )}
+                onClick={handleFollow}
+                disabled={followLoading}
+              >
+                {profile.isFollowing ? "フォロー中" : "フォローする"}
+              </Button>
+            )}
           </div>
-        )}
 
-        <div className="mt-4 flex gap-4 text-sm">
-          <Link
-            href={`/users/${profile.user_handle}/follows?tab=following`}
-            className="hover:underline"
-          >
-            <span className="font-semibold">{profile.followingCount}</span>{" "}
-            <span className="text-muted-foreground">フォロー中</span>
-          </Link>
-          <Link
-            href={`/users/${profile.user_handle}/follows?tab=followers`}
-            className="hover:underline"
-          >
-            <span className="font-semibold">{profile.followerCount}</span>{" "}
-            <span className="text-muted-foreground">フォロワー</span>
-          </Link>
+          {/* Name & handle */}
+          <div className="mt-3">
+            <h1 className="text-xl font-bold leading-tight">{profile.display_name}</h1>
+            <p className="text-sm text-muted-foreground">@{profile.user_handle}</p>
+          </div>
+
+          {/* Bio */}
+          {profile.bio && (
+            <p className="mt-3 text-sm leading-relaxed">{profile.bio}</p>
+          )}
+
+          {/* Attribute Panel (grid layout) */}
+          {publicAttrs.length > 0 && (
+            <div className="mt-4">
+              <AttributePanel attributes={publicAttrs} />
+            </div>
+          )}
+
+          {/* Follower/Following counts */}
+          <div className="mt-4 flex gap-5 text-sm">
+            <Link
+              href={`/users/${profile.user_handle}/follows?tab=following`}
+              className="transition-colors hover:text-foreground"
+            >
+              <span className="font-bold">{profile.followingCount}</span>{" "}
+              <span className="text-muted-foreground">フォロー中</span>
+            </Link>
+            <Link
+              href={`/users/${profile.user_handle}/follows?tab=followers`}
+              className="transition-colors hover:text-foreground"
+            >
+              <span className="font-bold">{profile.followerCount}</span>{" "}
+              <span className="text-muted-foreground">フォロワー</span>
+            </Link>
+          </div>
         </div>
       </div>
 
-      <Separator />
+      {/* Position Map (own profile only) */}
+      {profile.isOwnProfile && positionData && (
+        <div className="border-b px-4 py-5">
+          <PositionMap
+            axes={positionData.axes}
+            echoChamberScore={positionData.echoChamberScore}
+            echoChamberMessage={positionData.message}
+          />
+        </div>
+      )}
 
-      {/* Posts */}
+      {/* Tab-style divider */}
+      <div className="border-b">
+        <div className="flex justify-center">
+          <span className="border-b-2 border-primary px-6 py-3 text-sm font-semibold">
+            意見
+          </span>
+        </div>
+      </div>
+
+      {/* Posts - Masonry layout */}
       <InfiniteScroll
         hasMore={hasMore}
         isLoading={loadingMore}
         onLoadMore={handleLoadMore}
       >
         {posts.length === 0 ? (
-          <div className="px-4 py-8 text-center text-sm text-muted-foreground">
-            まだ投稿がありません
+          <div className="px-4 py-12 text-center text-sm text-muted-foreground">
+            まだ意見がありません
           </div>
         ) : (
-          posts.map((post) => (
-            <PostCard
-              key={post.id}
-              id={post.id}
-              author={{
-                handle: post.author?.user_handle ?? "",
-                displayName: post.author?.display_name ?? "",
-                avatarUrl: post.author?.avatar_url ?? null,
-                attributes: mapAttributes(post.author?.attributes ?? null),
-              }}
-              content={post.content}
-              createdAt={post.created_at}
-              goodCount={post.goodCount}
-              badCount={post.badCount}
-              replyCount={post.replyCount ?? 0}
-              repostCount={post.repostCount ?? 0}
-              isOwnPost={post.badCount !== undefined}
-              userReaction={post.currentUserReaction}
-            />
-          ))
+          <div className="columns-1 gap-4 p-4 sm:columns-2">
+            {posts.map((post) => (
+              <OpinionTile
+                key={post.id}
+                id={post.id}
+                author={{
+                  handle: post.author?.user_handle ?? "",
+                  displayName: post.author?.display_name ?? "",
+                  avatarUrl: post.author?.avatar_url ?? null,
+                  attributes: mapAttributes(post.author?.attributes ?? null),
+                }}
+                title={post.title}
+                content={post.content}
+                createdAt={post.created_at}
+                reactionCount={post.reactionCount}
+                averageScore={post.averageScore}
+                currentUserScore={post.currentUserScore}
+                isOwnPost={user?.id === post.user_id}
+                onReaction={(score) => handleReaction(post.id, score)}
+                onReactionRemove={() => handleReactionRemove(post.id)}
+                className="mb-4"
+              />
+            ))}
+          </div>
         )}
       </InfiniteScroll>
     </div>

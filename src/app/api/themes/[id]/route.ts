@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { calculateConsensusScore } from "@/lib/utils/consensus";
 
 // GET /api/themes/:id - Get theme detail
 export async function GET(
@@ -23,13 +24,38 @@ export async function GET(
       );
     }
 
-    const { count: postCount } = await supabase
+    // Get theme posts
+    const { data: themePosts } = await supabase
       .from("theme_posts")
-      .select("*", { count: "exact", head: true })
+      .select("post_id")
       .eq("theme_id", id);
 
+    const postIds = themePosts?.map((tp) => tp.post_id) ?? [];
+    const postCount = postIds.length;
+
+    // Get unique participant count
+    let participantCount = 0;
+    if (postIds.length > 0) {
+      const { data: posts } = await supabase
+        .from("posts")
+        .select("user_id")
+        .in("id", postIds);
+      const uniqueUsers = new Set(posts?.map((p) => p.user_id) ?? []);
+      participantCount = uniqueUsers.size;
+    }
+
+    // Calculate consensus score
+    let consensusScore = 0;
+    if (postIds.length > 0) {
+      const { data: reactions } = await supabase
+        .from("reactions")
+        .select("reaction_score")
+        .in("post_id", postIds);
+      consensusScore = calculateConsensusScore(reactions ?? []);
+    }
+
     return NextResponse.json({
-      data: { ...theme, postCount: postCount ?? 0 },
+      data: { ...theme, postCount, participantCount, consensusScore },
       status: 200,
     });
   } catch {

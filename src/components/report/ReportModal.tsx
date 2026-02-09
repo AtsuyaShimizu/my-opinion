@@ -10,14 +10,14 @@ import {
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
-import { Loader2 } from "lucide-react";
+import { Loader2, CheckCircle } from "lucide-react";
 import { apiFetch } from "@/lib/api/client";
 import { cn } from "@/lib/utils";
 
 const REPORT_REASONS = [
-  { value: "attribute_discrimination", label: "属性差別" },
+  { value: "attribute_discrimination", label: "プロフィール差別" },
   { value: "defamation", label: "誹謗中傷" },
-  { value: "fake_attribute", label: "虚偽属性" },
+  { value: "fake_attribute", label: "偽りのプロフィール" },
   { value: "impersonation", label: "なりすまし" },
   { value: "spam", label: "スパム" },
   { value: "other", label: "その他" },
@@ -78,26 +78,29 @@ export function ReportModal({
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle>
-            {targetType === "post" ? "投稿を通報" : "ユーザーを通報"}
+            {targetType === "post" ? "意見を通報" : "ユーザーを通報"}
           </DialogTitle>
         </DialogHeader>
 
         {submitted ? (
-          <div className="space-y-4 py-4 text-center">
-            <p className="text-sm">
+          <div className="space-y-4 py-6 text-center">
+            <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-primary/10">
+              <CheckCircle className="h-6 w-6 text-primary" />
+            </div>
+            <p className="text-sm font-medium">
               通報を受け付けました。ご協力ありがとうございます。
             </p>
             <p className="text-xs text-muted-foreground">
               内容を確認し、必要に応じて対応いたします。
             </p>
-            <Button onClick={handleClose} className="w-full">
+            <Button onClick={handleClose} variant="outline" className="w-full">
               閉じる
             </Button>
           </div>
         ) : (
-          <div className="space-y-4">
+          <div className="space-y-5">
             <div className="space-y-2">
-              <Label>通報理由</Label>
+              <Label className="text-xs font-medium uppercase tracking-wider text-muted-foreground">通報理由</Label>
               <div className="grid grid-cols-2 gap-2">
                 {REPORT_REASONS.map((r) => (
                   <button
@@ -105,10 +108,10 @@ export function ReportModal({
                     type="button"
                     onClick={() => setReason(r.value)}
                     className={cn(
-                      "rounded-md border px-3 py-2 text-sm transition-colors",
+                      "rounded-lg border px-3 py-2.5 text-sm transition-all",
                       reason === r.value
-                        ? "border-primary bg-primary text-primary-foreground"
-                        : "border-border hover:bg-accent"
+                        ? "border-primary bg-primary/10 font-medium text-primary"
+                        : "border-border text-muted-foreground hover:border-primary/30 hover:text-foreground"
                     )}
                   >
                     {r.label}
@@ -118,7 +121,7 @@ export function ReportModal({
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="detail">詳細（任意）</Label>
+              <Label htmlFor="detail" className="text-xs font-medium uppercase tracking-wider text-muted-foreground">詳細（任意）</Label>
               <Textarea
                 id="detail"
                 value={detail}
@@ -129,7 +132,7 @@ export function ReportModal({
               />
             </div>
 
-            <div className="flex gap-2">
+            <div className="flex gap-2 pt-1">
               <Button
                 variant="outline"
                 onClick={handleClose}

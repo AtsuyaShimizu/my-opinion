@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { enrichPostsWithAuthorAndReactions } from "@/lib/utils/enrichPosts";
 
 const DEFAULT_LIMIT = 20;
 
-// GET /api/posts/:id/replies - Get replies to a post
+// GET /api/posts/:id/replies - Get replies to a post with reaction data
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -43,40 +44,35 @@ export async function GET(
     const items = hasMore ? replies!.slice(0, limit) : (replies ?? []);
     const nextCursor = hasMore ? items[items.length - 1].created_at : null;
 
-    // Enrich with author info
-    const userIds = [...new Set(items.map((r) => r.user_id))];
-    const { data: users } = await supabase
-      .from("users")
-      .select("id, user_handle, display_name, avatar_url")
-      .in("id", userIds.length > 0 ? userIds : ["__none__"]);
+    const {
+      data: { user: currentUser },
+    } = await supabase.auth.getUser();
 
-    const { data: allAttributes } = await supabase
-      .from("user_attributes")
-      .select("*")
-      .in("user_id", userIds.length > 0 ? userIds : ["__none__"]);
+    const enrichedReplies = await enrichPostsWithAuthorAndReactions(
+      supabase,
+      items,
+      currentUser?.id ?? null
+    );
 
-    const userMap = new Map(users?.map((u) => [u.id, u]) ?? []);
-    const attrMap = new Map(allAttributes?.map((a) => [a.user_id, a]) ?? []);
+    // Add reply counts per reply
+    const replyIds = items.map((r) => r.id);
+    if (replyIds.length > 0) {
+      const { data: nestedReplies } = await supabase
+        .from("posts")
+        .select("parent_post_id")
+        .in("parent_post_id", replyIds);
 
-    const enrichedReplies = items.map((reply) => {
-      const author = userMap.get(reply.user_id);
-      const attrs = attrMap.get(reply.user_id);
-      const publicAttributes = attrs
-        ? {
-            gender: attrs.is_gender_public ? attrs.gender : null,
-            age_range: attrs.is_age_range_public ? attrs.age_range : null,
-            education: attrs.is_education_public ? attrs.education : null,
-            occupation: attrs.is_occupation_public ? attrs.occupation : null,
-            political_party: attrs.is_political_party_public ? attrs.political_party : null,
-            political_stance: attrs.is_political_stance_public ? attrs.political_stance : null,
-          }
-        : null;
+      const replyCounts = new Map<string, number>();
+      for (const r of nestedReplies ?? []) {
+        if (r.parent_post_id) {
+          replyCounts.set(r.parent_post_id, (replyCounts.get(r.parent_post_id) ?? 0) + 1);
+        }
+      }
 
-      return {
-        ...reply,
-        author: author ? { ...author, attributes: publicAttributes } : null,
-      };
-    });
+      for (const reply of enrichedReplies) {
+        (reply as typeof reply & { replyCount: number }).replyCount = replyCounts.get(reply.id) ?? 0;
+      }
+    }
 
     return NextResponse.json({
       data: {

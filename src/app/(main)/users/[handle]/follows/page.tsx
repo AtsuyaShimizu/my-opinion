@@ -56,7 +56,7 @@ export default function FollowsPage({
 
   return (
     <div>
-      <div className="sticky top-14 z-40 border-b bg-background/95 backdrop-blur lg:top-0">
+      <div className="sticky top-14 z-40 border-b bg-background/80 backdrop-blur-lg lg:top-0">
         <div className="flex items-center gap-3 px-4 py-3">
           <Button variant="ghost" size="icon" onClick={() => window.history.back()}>
             <ArrowLeft className="h-5 w-5" />
@@ -66,10 +66,10 @@ export default function FollowsPage({
         <div className="flex">
           <button
             className={cn(
-              "flex-1 border-b-2 px-4 py-3 text-sm font-medium transition-colors",
+              "flex-1 border-b-2 px-4 py-3 text-sm font-medium transition-all duration-200",
               tab === "following"
                 ? "border-primary text-primary"
-                : "border-transparent text-muted-foreground hover:text-foreground"
+                : "border-transparent text-muted-foreground hover:text-foreground hover:bg-accent/50"
             )}
             onClick={() => setTab("following")}
           >
@@ -77,10 +77,10 @@ export default function FollowsPage({
           </button>
           <button
             className={cn(
-              "flex-1 border-b-2 px-4 py-3 text-sm font-medium transition-colors",
+              "flex-1 border-b-2 px-4 py-3 text-sm font-medium transition-all duration-200",
               tab === "followers"
                 ? "border-primary text-primary"
-                : "border-transparent text-muted-foreground hover:text-foreground"
+                : "border-transparent text-muted-foreground hover:text-foreground hover:bg-accent/50"
             )}
             onClick={() => setTab("followers")}
           >

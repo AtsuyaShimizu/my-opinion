@@ -75,9 +75,6 @@ export type PoliticalStance =
   | 'center_right'
   | 'right';
 
-/** 評価タイプ */
-export type ReactionType = 'good' | 'bad';
-
 /** 同意タイプ */
 export type ConsentType =
   | 'terms_of_service'
@@ -89,7 +86,7 @@ export type ConsentType =
 export type NotificationType =
   | 'reply'
   | 'follow'
-  | 'good'
+  | 'reaction'
   | 'theme_start'
   | 'analysis_ready';
 
@@ -191,6 +188,7 @@ export type ConsentRecord = {
 export type Post = {
   id: string;
   user_id: string;
+  title: string | null;
   content: string;
   parent_post_id: string | null;
   repost_of_id: string | null;
@@ -203,7 +201,7 @@ export type Reaction = {
   id: string;
   user_id: string;
   post_id: string;
-  reaction_type: ReactionType;
+  reaction_score: number;
   reactor_attribute_snapshot: ReactorAttributeSnapshot | null;
   created_at: string;
 };
@@ -327,6 +325,7 @@ export type ConsentRecordInsert = {
 export type PostInsert = {
   id?: string;
   user_id: string;
+  title?: string | null;
   content: string;
   parent_post_id?: string | null;
   repost_of_id?: string | null;
@@ -336,7 +335,7 @@ export type ReactionInsert = {
   id?: string;
   user_id: string;
   post_id: string;
-  reaction_type: ReactionType;
+  reaction_score: number;
   reactor_attribute_snapshot?: ReactorAttributeSnapshot | null;
 };
 
@@ -407,7 +406,7 @@ export type AdminActionInsert = {
 
 export type UserUpdate = Partial<Omit<User, 'id' | 'created_at' | 'updated_at'>>;
 export type UserAttributeUpdate = Partial<Omit<UserAttribute, 'id' | 'user_id' | 'created_at' | 'updated_at'>>;
-export type PostUpdate = Partial<Pick<Post, 'content'>>;
+export type PostUpdate = Partial<Pick<Post, 'content' | 'title'>>;
 export type NotificationUpdate = Partial<Pick<Notification, 'is_read'>>;
 export type ReportUpdate = Partial<Pick<Report, 'status' | 'reviewed_by' | 'resolved_at'>>;
 export type ThemeUpdate = Partial<Omit<Theme, 'id' | 'created_by' | 'created_at' | 'updated_at'>>;
@@ -446,7 +445,7 @@ export type Database = {
       reactions: {
         Row: Reaction;
         Insert: ReactionInsert;
-        Update: Partial<Pick<Reaction, 'reaction_type'>>;
+        Update: Partial<Pick<Reaction, 'reaction_score'>>;
         Relationships: [];
       };
       follows: {

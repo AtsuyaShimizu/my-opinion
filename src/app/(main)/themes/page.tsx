@@ -38,14 +38,14 @@ export default function ThemesPage() {
   return (
     <div>
       <div className="sticky top-14 z-40 border-b bg-background/95 px-4 py-3 backdrop-blur lg:top-0">
-        <h1 className="text-lg font-bold">テーマ</h1>
+        <h1 className="text-lg font-bold">トピック</h1>
       </div>
 
       {themes.length === 0 ? (
         <EmptyState
           icon={MessageSquare}
-          title="テーマがまだありません"
-          description="運営がテーマを作成するまでお待ちください。"
+          title="トピックがまだありません"
+          description="運営がトピックを作成するまでお待ちください。"
         />
       ) : (
         <div className="divide-y">
@@ -53,22 +53,30 @@ export default function ThemesPage() {
             <Link
               key={theme.id}
               href={`/themes/${theme.id}`}
-              className="block px-4 py-4 transition-colors hover:bg-accent/50"
+              className="block px-4 py-4 transition-colors hover:bg-accent/40"
             >
-              <div className="flex items-start justify-between gap-2">
+              <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0 flex-1">
-                  <h2 className="font-semibold">{theme.title}</h2>
+                  <div className="flex items-center gap-2">
+                    <h2 className="font-semibold">{theme.title}</h2>
+                    {theme.status === "active" ? (
+                      <span className="rounded-full bg-emerald-50/80 px-2 py-0.5 text-[11px] font-medium text-emerald-700 dark:bg-emerald-950/30 dark:text-emerald-400">
+                        投稿受付中
+                      </span>
+                    ) : (
+                      <span className="rounded-full bg-muted px-2 py-0.5 text-[11px] font-medium text-muted-foreground">
+                        終了
+                      </span>
+                    )}
+                  </div>
                   {theme.description && (
-                    <p className="mt-1 text-sm text-muted-foreground line-clamp-2">
+                    <p className="mt-1.5 text-sm leading-relaxed text-muted-foreground line-clamp-2">
                       {theme.description}
                     </p>
                   )}
-                  <div className="mt-2 flex items-center gap-3 text-xs text-muted-foreground">
-                    <span>{theme.postCount} 件の投稿</span>
-                    {theme.status === "ended" && (
-                      <span className="rounded bg-muted px-2 py-0.5">終了</span>
-                    )}
-                  </div>
+                  <p className="mt-2 text-xs text-muted-foreground/70">
+                    {theme.postCount} 件の投稿
+                  </p>
                 </div>
               </div>
             </Link>

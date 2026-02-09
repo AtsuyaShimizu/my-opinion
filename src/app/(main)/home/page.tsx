@@ -1,22 +1,38 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { Loader2, Users } from "lucide-react";
-import { PostCard } from "@/components/post/PostCard";
-import { EmptyState } from "@/components/common/EmptyState";
-import { InfiniteScroll } from "@/components/common/InfiniteScroll";
+import Link from "next/link";
+import { FeaturedTopicHero } from "@/components/theme/FeaturedTopicHero";
+import { TopicCard } from "@/components/theme/TopicCard";
+import { OpinionCardCompact } from "@/components/post/OpinionCardCompact";
+import { PostCardSkeleton } from "@/components/post/PostCardSkeleton";
 import { ComposeModal } from "@/components/post/ComposeModal";
-import { Button } from "@/components/ui/button";
 import { apiFetch } from "@/lib/api/client";
+import { mapAttributes } from "@/lib/utils/mapAttributes";
+import { useAuth } from "@/hooks/useAuth";
+import { toast } from "sonner";
+
+interface ThemeWithConsensus {
+  id: string;
+  title: string;
+  description: string | null;
+  postCount: number;
+  participantCount: number;
+  consensusScore: number;
+  start_date: string;
+  end_date: string | null;
+  status: "active" | "ended";
+}
 
 interface TimelinePost {
   id: string;
+  title?: string | null;
   content: string;
   created_at: string;
   user_id: string;
-  goodCount: number;
-  badCount?: number;
-  currentUserReaction: "good" | "bad" | null;
+  reactionCount: number;
+  averageScore: number | null;
+  currentUserScore: number | null;
   repost_of_id?: string | null;
   author: {
     user_handle: string;
@@ -26,146 +42,175 @@ interface TimelinePost {
   } | null;
 }
 
-function mapAttributes(attrs: Record<string, string | null> | null) {
-  if (!attrs) return [];
-  const typeMap: Record<string, "gender" | "age_range" | "education" | "occupation" | "political_stance" | "political_party"> = {
-    gender: "gender", age_range: "age_range", education: "education",
-    occupation: "occupation", political_stance: "political_stance", political_party: "political_party",
-  };
-  return Object.entries(attrs)
-    .filter(([key, val]) => val != null && key in typeMap)
-    .map(([key, val]) => ({ type: typeMap[key], value: val as string }));
-}
-
 export default function HomePage() {
+  const { user } = useAuth();
+  const [featured, setFeatured] = useState<ThemeWithConsensus | null>(null);
+  const [trending, setTrending] = useState<ThemeWithConsensus[]>([]);
   const [posts, setPosts] = useState<TimelinePost[]>([]);
   const [loading, setLoading] = useState(true);
-  const [loadingMore, setLoadingMore] = useState(false);
-  const [hasMore, setHasMore] = useState(true);
-  const [cursor, setCursor] = useState<string | null>(null);
   const [composeOpen, setComposeOpen] = useState(false);
+  const [composeThemeId, setComposeThemeId] = useState<string | undefined>();
+  const [composeThemeName, setComposeThemeName] = useState<string | undefined>();
 
-  const fetchPosts = useCallback(async (cursorParam?: string | null) => {
+  const fetchData = useCallback(async () => {
     try {
-      const url = cursorParam
-        ? `/api/timeline/home?cursor=${cursorParam}`
-        : "/api/timeline/home";
-      const data = await apiFetch<{ items: TimelinePost[]; nextCursor: string | null }>(url);
-      if (cursorParam) {
-        setPosts((prev) => [...prev, ...data.items]);
-      } else {
-        setPosts(data.items);
+      const [themeData, timelineData] = await Promise.all([
+        apiFetch<{ featured: ThemeWithConsensus; trending: ThemeWithConsensus[] }>("/api/themes/featured").catch(() => null),
+        apiFetch<{ items: TimelinePost[]; nextCursor: string | null }>("/api/timeline/home").catch(() => null),
+      ]);
+
+      if (themeData) {
+        setFeatured(themeData.featured);
+        setTrending(themeData.trending);
       }
-      setCursor(data.nextCursor);
-      setHasMore(!!data.nextCursor);
+      if (timelineData) {
+        setPosts(timelineData.items.slice(0, 3));
+      }
     } catch {
-      // API may not be ready yet
-      setHasMore(false);
+      // Silent
     }
   }, []);
 
   useEffect(() => {
     setLoading(true);
-    fetchPosts().finally(() => setLoading(false));
-  }, [fetchPosts]);
+    fetchData().finally(() => setLoading(false));
+  }, [fetchData]);
 
-  function handleLoadMore() {
-    if (loadingMore || !hasMore) return;
-    setLoadingMore(true);
-    fetchPosts(cursor).finally(() => setLoadingMore(false));
+  useEffect(() => {
+    function handlePostCreated() {
+      fetchData();
+    }
+    window.addEventListener("post-created", handlePostCreated);
+    return () => window.removeEventListener("post-created", handlePostCreated);
+  }, [fetchData]);
+
+  function handleParticipate(themeId: string, themeName: string) {
+    setComposeThemeId(themeId);
+    setComposeThemeName(themeName);
+    setComposeOpen(true);
   }
 
-  async function handleCompose(content: string) {
+  async function handleCompose(content: string, title?: string) {
     try {
       await apiFetch("/api/posts", {
         method: "POST",
-        body: JSON.stringify({ content }),
+        body: JSON.stringify({ content, title: title || undefined, themeId: composeThemeId }),
       });
-      fetchPosts();
+      fetchData();
     } catch {
-      // handle error
-    }
-  }
-
-  async function handleReaction(postId: string, type: "good" | "bad") {
-    try {
-      await apiFetch(`/api/posts/${postId}/reactions`, {
-        method: "POST",
-        body: JSON.stringify({ reactionType: type }),
-      });
-      fetchPosts();
-    } catch {
-      // handle error
+      toast.error("投稿に失敗しました");
     }
   }
 
   if (loading) {
     return (
-      <div className="flex justify-center py-16">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      <div>
+        <div className="sticky top-14 z-40 border-b bg-background/95 px-4 py-3 backdrop-blur lg:top-0">
+          <h1 className="text-xl font-bold">トピック</h1>
+        </div>
+        <div className="space-y-4 p-4">
+          <div className="h-48 animate-shimmer rounded-2xl bg-gradient-to-r from-muted via-muted/50 to-muted bg-[length:200%_100%]" />
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            {Array.from({ length: 4 }).map((_, i) => (
+              <div key={i} className="h-40 animate-shimmer rounded-2xl bg-gradient-to-r from-muted via-muted/50 to-muted bg-[length:200%_100%]" />
+            ))}
+          </div>
+          {Array.from({ length: 3 }).map((_, i) => (
+            <PostCardSkeleton key={i} />
+          ))}
+        </div>
       </div>
     );
   }
 
   return (
-    <div>
+    <div className="animate-fade-in-up">
       <div className="sticky top-14 z-40 border-b bg-background/95 px-4 py-3 backdrop-blur lg:top-0">
-        <h1 className="text-lg font-bold">ホーム</h1>
+        <h1 className="text-xl font-bold">トピック</h1>
       </div>
 
-      {/* Mobile compose button */}
-      <div className="border-b px-4 py-3 lg:hidden">
-        <Button onClick={() => setComposeOpen(true)} className="w-full">
-          投稿する
-        </Button>
-      </div>
-
-      {posts.length === 0 ? (
-        <EmptyState
-          icon={Users}
-          title="タイムラインに投稿がありません"
-          description="ユーザーをフォローして、タイムラインに投稿を表示しましょう。"
-          action={
-            <Button variant="outline" asChild>
-              <a href="/explore">ユーザーを探す</a>
-            </Button>
-          }
-        />
-      ) : (
-        <InfiniteScroll
-          hasMore={hasMore}
-          isLoading={loadingMore}
-          onLoadMore={handleLoadMore}
-        >
-          {posts.map((post) => (
-            <PostCard
-              key={post.id}
-              id={post.id}
-              author={{
-                handle: post.author?.user_handle ?? "",
-                displayName: post.author?.display_name ?? "",
-                avatarUrl: post.author?.avatar_url ?? null,
-                attributes: mapAttributes(post.author?.attributes ?? null),
-              }}
-              content={post.content}
-              createdAt={post.created_at}
-              goodCount={post.goodCount}
-              badCount={post.badCount}
-              replyCount={0}
-              repostCount={0}
-              isOwnPost={post.badCount !== undefined}
-              userReaction={post.currentUserReaction}
-              onGood={() => handleReaction(post.id, "good")}
-              onBad={() => handleReaction(post.id, "bad")}
+      <div className="space-y-8 p-4">
+        {/* Featured Topic Hero */}
+        {featured && (
+          <section>
+            <p className="mb-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+              いま話題のトピック
+            </p>
+            <FeaturedTopicHero
+              theme={featured}
+              onParticipate={() => handleParticipate(featured.id, featured.title)}
             />
-          ))}
-        </InfiniteScroll>
-      )}
+          </section>
+        )}
+
+        {/* Topic grid */}
+        {trending.length > 0 && (
+          <section>
+            <p className="mb-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+              注目のトピック
+            </p>
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              {trending.map((theme) => (
+                <TopicCard
+                  key={theme.id}
+                  id={theme.id}
+                  title={theme.title}
+                  description={theme.description}
+                  postCount={theme.postCount}
+                  participantCount={theme.participantCount}
+                  consensusScore={theme.consensusScore}
+                  status={theme.status}
+                />
+              ))}
+            </div>
+          </section>
+        )}
+
+        {/* Recent from following - compact cards */}
+        {posts.length > 0 && (
+          <section>
+            <p className="mb-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+              フォロー中の最新
+            </p>
+            <div className="space-y-3">
+              {posts.map((post) => (
+                <OpinionCardCompact
+                  key={post.id}
+                  id={post.id}
+                  author={{
+                    handle: post.author?.user_handle ?? "",
+                    displayName: post.author?.display_name ?? "",
+                    avatarUrl: post.author?.avatar_url ?? null,
+                    attributes: mapAttributes(post.author?.attributes ?? null),
+                  }}
+                  title={post.title}
+                  content={post.content}
+                  createdAt={post.created_at}
+                  averageScore={post.averageScore}
+                />
+              ))}
+            </div>
+            <div className="mt-3 text-center">
+              <Link href="/explore?tab=posts" className="text-sm font-medium text-primary hover:underline">
+                もっと見る
+              </Link>
+            </div>
+          </section>
+        )}
+      </div>
 
       <ComposeModal
         open={composeOpen}
-        onOpenChange={setComposeOpen}
+        onOpenChange={(open) => {
+          setComposeOpen(open);
+          if (!open) {
+            setComposeThemeId(undefined);
+            setComposeThemeName(undefined);
+          }
+        }}
         onSubmit={handleCompose}
+        defaultThemeId={composeThemeId}
+        defaultThemeName={composeThemeName}
       />
     </div>
   );

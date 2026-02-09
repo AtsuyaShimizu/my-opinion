@@ -2,9 +2,10 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { Loader2, ArrowLeft, Copy, Check } from "lucide-react";
+import { Loader2, ArrowLeft, Copy, Check, Ticket } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { apiFetch } from "@/lib/api/client";
+import { cn } from "@/lib/utils";
 
 interface InviteCode {
   id: string;
@@ -52,7 +53,8 @@ export default function InvitesPage() {
 
   return (
     <div>
-      <div className="sticky top-14 z-40 border-b bg-background/95 backdrop-blur lg:top-0">
+      {/* Header */}
+      <div className="sticky top-14 z-40 border-b bg-background/80 backdrop-blur-lg lg:top-0">
         <div className="flex items-center gap-3 px-4 py-3">
           <Button variant="ghost" size="icon" onClick={() => router.back()}>
             <ArrowLeft className="h-5 w-5" />
@@ -61,31 +63,45 @@ export default function InvitesPage() {
         </div>
       </div>
 
-      <div className="px-4 py-4">
-        <p className="text-sm text-muted-foreground">
-          友人を My Opinion に招待しましょう。招待コードを共有してください。
-        </p>
+      <div className="px-4 py-6">
+        <div className="flex items-start gap-3 rounded-xl border bg-card p-4">
+          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary/10">
+            <Ticket className="h-4.5 w-4.5 text-primary" />
+          </div>
+          <p className="text-sm leading-relaxed text-muted-foreground">
+            友人を My Opinion に招待しましょう。招待コードを共有してください。
+          </p>
+        </div>
       </div>
 
       {codes.length === 0 ? (
-        <div className="px-4 py-8 text-center text-sm text-muted-foreground">
+        <div className="px-4 py-12 text-center text-sm text-muted-foreground">
           招待コードがありません
         </div>
       ) : (
-        <div className="divide-y">
+        <div className="space-y-2 px-4 pb-8">
           {codes.map((code) => {
             const isUsed = !!code.used_by;
             const isExpired = new Date(code.expires_at) < new Date();
+            const isInactive = isUsed || isExpired;
             return (
               <div
                 key={code.id}
-                className="flex items-center justify-between px-4 py-3"
+                className={cn(
+                  "flex items-center justify-between rounded-xl border p-4 transition-colors",
+                  isInactive ? "bg-muted/50" : "bg-card"
+                )}
               >
                 <div>
-                  <p className={`font-mono text-lg font-semibold ${isUsed || isExpired ? "text-muted-foreground line-through" : ""}`}>
+                  <p
+                    className={cn(
+                      "font-mono text-lg font-semibold tracking-wide",
+                      isInactive && "text-muted-foreground line-through"
+                    )}
+                  >
                     {code.code}
                   </p>
-                  <p className="text-xs text-muted-foreground">
+                  <p className="mt-0.5 text-xs text-muted-foreground">
                     {isUsed
                       ? `使用済み (${formatDate(code.used_at!)})`
                       : isExpired
@@ -93,14 +109,15 @@ export default function InvitesPage() {
                         : `有効期限: ${formatDate(code.expires_at)}`}
                   </p>
                 </div>
-                {!isUsed && !isExpired && (
+                {!isInactive && (
                   <Button
                     variant="ghost"
                     size="icon"
+                    className="shrink-0"
                     onClick={() => handleCopy(code.code, code.id)}
                   >
                     {copiedId === code.id ? (
-                      <Check className="h-4 w-4 text-green-600" />
+                      <Check className="h-4 w-4 text-primary" />
                     ) : (
                       <Copy className="h-4 w-4" />
                     )}

@@ -1,6 +1,11 @@
 import { z } from "zod/v4";
 
 export const createPostSchema = z.object({
+  title: z
+    .string()
+    .max(60, "タイトルは60文字以内で入力してください")
+    .transform(v => v.trim() || undefined)
+    .optional(),
   content: z
     .string()
     .min(1, "投稿内容を入力してください")

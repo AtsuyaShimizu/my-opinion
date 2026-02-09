@@ -1,11 +1,35 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
-import { ThumbsUp, ThumbsDown, MessageCircle, Repeat2 } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { Frown, Smile, MessageCircle, Repeat2, MoreHorizontal, Link2, Share, Flag, Trash2, BarChart3 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle as AlertDialogTitleComp,
+} from "@/components/ui/alert-dialog";
+import {
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+} from "@/components/ui/dropdown-menu";
 import { UserAvatar } from "@/components/user/UserAvatar";
 import { AttributeBadge } from "@/components/user/AttributeBadge";
+import { PostContent } from "@/components/post/PostContent";
+import { ReactionSlider } from "@/components/post/ReactionSlider";
+import { ReportModal } from "@/components/report/ReportModal";
+import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import { formatRelativeTime } from "@/lib/utils/formatTime";
 
 interface PostAttribute {
   type: "gender" | "age_range" | "education" | "occupation" | "political_stance" | "political_party";
@@ -20,192 +44,319 @@ interface PostCardProps {
     avatarUrl?: string | null;
     attributes?: PostAttribute[];
   };
+  title?: string | null;
   content: string;
   createdAt: string;
-  goodCount: number;
-  badCount?: number;
+  reactionCount: number;
+  averageScore: number | null;
+  currentUserScore: number | null;
   replyCount: number;
   repostCount: number;
   isOwnPost?: boolean;
-  userReaction?: "good" | "bad" | null;
+  isReposted?: boolean;
+  isOfficialTopic?: boolean;
   repostedBy?: string;
   themeName?: string;
-  onGood?: () => void;
-  onBad?: () => void;
-  onRepost?: () => void;
-}
-
-function formatRelativeTime(dateStr: string): string {
-  const now = new Date();
-  const date = new Date(dateStr);
-  const diff = now.getTime() - date.getTime();
-  const seconds = Math.floor(diff / 1000);
-  const minutes = Math.floor(seconds / 60);
-  const hours = Math.floor(minutes / 60);
-  const days = Math.floor(hours / 24);
-
-  if (days > 0) return `${days}日前`;
-  if (hours > 0) return `${hours}時間前`;
-  if (minutes > 0) return `${minutes}分前`;
-  return "たった今";
+  onReaction?: (score: number) => void;
+  onReactionRemove?: () => void;
+  onRepost?: () => void | Promise<void>;
+  onDelete?: () => void | Promise<void>;
 }
 
 export function PostCard({
   id,
   author,
+  title,
   content,
   createdAt,
-  goodCount,
-  badCount,
+  reactionCount,
+  averageScore,
+  currentUserScore,
   replyCount,
   repostCount,
   isOwnPost = false,
-  userReaction,
+  isReposted = false,
+  isOfficialTopic = false,
   repostedBy,
   themeName,
-  onGood,
-  onBad,
+  onReaction,
+  onReactionRemove,
   onRepost,
+  onDelete,
 }: PostCardProps) {
+  const router = useRouter();
+  const [reportOpen, setReportOpen] = useState(false);
+  const [reposted, setReposted] = useState(isReposted);
+  const [repostConfirmOpen, setRepostConfirmOpen] = useState(false);
+
+  function handleCopyLink() {
+    const url = `${window.location.origin}/posts/${id}`;
+    navigator.clipboard.writeText(url)
+      .then(() => toast("リンクをコピーしました"))
+      .catch(() => toast.error("コピーに失敗しました"));
+  }
+
+  function handleShare() {
+    const url = `${window.location.origin}/posts/${id}`;
+    if (navigator.share) {
+      navigator.share({ url });
+    } else {
+      navigator.clipboard.writeText(url);
+      toast("リンクをコピーしました");
+    }
+  }
+
+  async function handleDelete() {
+    try {
+      await onDelete?.();
+      toast("意見を削除しました");
+    } catch {
+      toast.error("削除に失敗しました");
+    }
+  }
+
+  async function handleRepostConfirm() {
+    setRepostConfirmOpen(false);
+    if (reposted) return;
+    try {
+      if (onRepost) {
+        await onRepost();
+      }
+      setReposted(true);
+      toast("リポストしました");
+    } catch {
+      toast.error("リポストに失敗しました");
+    }
+  }
+
+  // Icon color logic based on current user score
+  const frownColor =
+    currentUserScore !== null && currentUserScore <= 30
+      ? "text-rose-400"
+      : currentUserScore !== null && currentUserScore <= 69
+        ? "text-amber-400/60"
+        : "text-muted-foreground/40";
+
+  const smileColor =
+    currentUserScore !== null && currentUserScore >= 70
+      ? "text-emerald-400"
+      : currentUserScore !== null && currentUserScore >= 31
+        ? "text-amber-400/60"
+        : "text-muted-foreground/40";
+
   return (
-    <article className="border-b px-4 py-4 transition-colors hover:bg-accent/50">
-      {repostedBy && (
-        <div className="mb-2 flex items-center gap-2 pl-12 text-sm text-muted-foreground">
-          <Repeat2 className="h-4 w-4" />
-          <span>{repostedBy} がリポスト</span>
-        </div>
-      )}
+    <article className="border-b bg-card transition-all duration-200 hover:bg-accent/30">
+      <div className="px-4 pt-4 pb-3">
+        {/* Repost indicator */}
+        {repostedBy && (
+          <div className="mb-2 flex items-center gap-2 text-sm text-muted-foreground">
+            <Repeat2 className="h-4 w-4" />
+            <span>{repostedBy} がリポスト</span>
+          </div>
+        )}
 
-      <div className="flex gap-3">
-        <Link href={`/users/${author.handle}`} className="shrink-0">
-          <UserAvatar
-            src={author.avatarUrl}
-            displayName={author.displayName}
-            size="md"
-          />
-        </Link>
-
-        <div className="min-w-0 flex-1">
-          <div className="flex items-baseline gap-2">
-            <Link
-              href={`/users/${author.handle}`}
-              className="truncate font-semibold hover:underline"
-            >
-              {author.displayName}
-            </Link>
-            <span className="truncate text-sm text-muted-foreground">
-              @{author.handle}
-            </span>
-            <span className="shrink-0 text-sm text-muted-foreground">
-              · {formatRelativeTime(createdAt)}
+        {/* Official topic label or theme name label */}
+        {isOfficialTopic ? (
+          <div className="mb-2">
+            <span className="inline-flex items-center gap-1 rounded-full bg-amber-500/10 px-2.5 py-0.5 text-xs font-semibold text-amber-600">
+              公式トピック
             </span>
           </div>
+        ) : themeName ? (
+          <div className="mb-2">
+            <span className="inline-flex items-center gap-1 rounded-full bg-primary/8 px-2.5 py-0.5 text-xs font-medium text-primary">
+              {themeName}
+            </span>
+          </div>
+        ) : null}
 
-          {author.attributes && author.attributes.length > 0 && (
-            <div className="mt-1 flex flex-wrap gap-1">
-              {author.attributes.map((attr) => (
-                <AttributeBadge
-                  key={attr.type}
-                  type={attr.type}
-                  value={attr.value}
-                />
-              ))}
-            </div>
-          )}
+        {/* Title (topic posts only) */}
+        {title && (
+          <div className="mb-2 cursor-pointer" onClick={() => router.push(`/posts/${id}`)}>
+            <h3 className="text-base font-bold leading-snug text-foreground">
+              {title}
+            </h3>
+            <div className="mt-2 border-b border-border/40" />
+          </div>
+        )}
 
-          {themeName && (
-            <div className="mt-1 text-xs text-primary">
-              # {themeName}
-            </div>
-          )}
+        {/* Main content */}
+        <div onClick={() => router.push(`/posts/${id}`)} className="cursor-pointer">
+          <PostContent
+            content={content}
+            className="text-[15px] leading-relaxed whitespace-pre-wrap break-words"
+          />
+        </div>
 
-          <Link href={`/posts/${id}`}>
-            <p className="mt-2 whitespace-pre-wrap break-words text-sm leading-relaxed">
-              {content}
-            </p>
+        {/* Background tags */}
+        {author.attributes && author.attributes.length > 0 && (
+          <div className="mt-3 flex flex-wrap gap-1.5">
+            {author.attributes.map((attr) => (
+              <AttributeBadge
+                key={attr.type}
+                type={attr.type}
+                value={attr.value}
+                size="md"
+              />
+            ))}
+          </div>
+        )}
+
+        {/* Author row (subtle) */}
+        <div className="mt-3 flex items-center gap-2">
+          <Link href={`/users/${author.handle}`} className="shrink-0">
+            <UserAvatar
+              src={author.avatarUrl}
+              displayName={author.displayName}
+              size="xs"
+            />
           </Link>
+          <Link
+            href={`/users/${author.handle}`}
+            className="text-xs text-muted-foreground hover:text-foreground hover:underline"
+          >
+            {author.displayName} · {formatRelativeTime(createdAt)}
+          </Link>
+          <div className="ml-auto shrink-0">
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-foreground">
+                  <MoreHorizontal className="h-3.5 w-3.5" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onClick={handleCopyLink}>
+                  <Link2 className="h-4 w-4" />
+                  リンクをコピー
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={handleShare}>
+                  <Share className="h-4 w-4" />
+                  シェアする
+                </DropdownMenuItem>
+                {!isOwnPost && (
+                  <>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem onClick={() => setReportOpen(true)} variant="destructive">
+                      <Flag className="h-4 w-4" />
+                      通報する
+                    </DropdownMenuItem>
+                  </>
+                )}
+                {isOwnPost && onDelete && (
+                  <>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem onClick={handleDelete} variant="destructive">
+                      <Trash2 className="h-4 w-4" />
+                      削除する
+                    </DropdownMenuItem>
+                  </>
+                )}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
+        </div>
 
-          <div className="mt-3 flex items-center gap-6">
+        {/* Slider reaction */}
+        <div className="mt-3">
+          <div className="flex items-center gap-2">
+            <Frown className={cn("h-5 w-5 shrink-0 transition-colors", frownColor)} />
+            <ReactionSlider
+              value={currentUserScore}
+              onChange={onReaction}
+              onRemove={onReactionRemove}
+              disabled={isOwnPost}
+              showAverage={reactionCount > 0}
+              averageScore={averageScore}
+            />
+            <Smile className={cn("h-5 w-5 shrink-0 transition-colors", smileColor)} />
+          </div>
+          <div className="mt-1 flex items-center justify-between text-xs text-muted-foreground">
+            <span>{reactionCount > 0 ? `平均 ${averageScore}` : ""}</span>
+            <span>{reactionCount > 0 ? `${reactionCount}件` : "スライドして評価"}</span>
+          </div>
+        </div>
+
+        {/* Action bar */}
+        <div className="-ml-2 mt-2 flex items-center gap-4">
+          <Button
+            variant="ghost"
+            size="sm"
+            className="gap-1.5 text-muted-foreground transition-colors hover:text-primary"
+            asChild
+          >
+            <Link href={`/posts/${id}`}>
+              <MessageCircle className="h-4 w-4" />
+              {replyCount > 0 && (
+                <span className={cn("text-xs", title && replyCount >= 10 && "font-semibold text-primary")}>
+                  {replyCount}
+                </span>
+              )}
+            </Link>
+          </Button>
+
+          <Button
+            variant="ghost"
+            size="sm"
+            disabled={isOwnPost || !onRepost}
+            onClick={() => {
+              if (!reposted && onRepost) setRepostConfirmOpen(true);
+            }}
+            className={cn(
+              "gap-1.5 transition-colors",
+              isOwnPost || !onRepost
+                ? "text-muted-foreground"
+                : reposted
+                  ? "text-primary"
+                  : "text-muted-foreground hover:text-primary"
+            )}
+          >
+            <Repeat2 className="h-4 w-4" />
+            {repostCount > 0 && (
+              <span className={cn("text-xs", reposted && "text-primary")}>
+                {repostCount}
+              </span>
+            )}
+          </Button>
+
+          {isOwnPost && (
             <Button
               variant="ghost"
               size="sm"
-              className="gap-1.5 text-muted-foreground hover:text-primary"
+              className="ml-auto gap-1.5 text-muted-foreground transition-colors hover:text-primary"
               asChild
             >
-              <Link href={`/posts/${id}`}>
-                <MessageCircle className="h-4 w-4" />
-                {replyCount > 0 && (
-                  <span className="text-xs">{replyCount}</span>
-                )}
+              <Link href={`/posts/${id}/analysis`}>
+                <BarChart3 className="h-4 w-4" />
+                <span className="text-xs">レスポンス分析</span>
               </Link>
             </Button>
-
-            <Button
-              variant="ghost"
-              size="sm"
-              className="gap-1.5 text-muted-foreground hover:text-green-600"
-              onClick={onRepost}
-            >
-              <Repeat2 className="h-4 w-4" />
-              {repostCount > 0 && (
-                <span className="text-xs">{repostCount}</span>
-              )}
-            </Button>
-
-            <Button
-              variant="ghost"
-              size="sm"
-              className={cn(
-                "gap-1.5 hover:text-blue-600",
-                userReaction === "good"
-                  ? "text-blue-600"
-                  : "text-muted-foreground"
-              )}
-              onClick={onGood}
-            >
-              <ThumbsUp className="h-4 w-4" />
-              {goodCount > 0 && (
-                <span className="text-xs">{goodCount}</span>
-              )}
-            </Button>
-
-            {isOwnPost && badCount !== undefined && (
-              <Button
-                variant="ghost"
-                size="sm"
-                className={cn(
-                  "gap-1.5 hover:text-red-600",
-                  userReaction === "bad"
-                    ? "text-red-600"
-                    : "text-muted-foreground"
-                )}
-                onClick={onBad}
-              >
-                <ThumbsDown className="h-4 w-4" />
-                {badCount > 0 && (
-                  <span className="text-xs">{badCount}</span>
-                )}
-              </Button>
-            )}
-
-            {!isOwnPost && (
-              <Button
-                variant="ghost"
-                size="sm"
-                className={cn(
-                  "gap-1.5 hover:text-red-600",
-                  userReaction === "bad"
-                    ? "text-red-600"
-                    : "text-muted-foreground"
-                )}
-                onClick={onBad}
-              >
-                <ThumbsDown className="h-4 w-4" />
-              </Button>
-            )}
-          </div>
+          )}
         </div>
       </div>
+
+      <ReportModal
+        open={reportOpen}
+        onOpenChange={setReportOpen}
+        targetType="post"
+        targetId={id}
+      />
+
+      <AlertDialog open={repostConfirmOpen} onOpenChange={setRepostConfirmOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitleComp>この意見をリポストしますか？</AlertDialogTitleComp>
+            <AlertDialogDescription>
+              リポストすると、あなたのフォロワーのタイムラインにこの意見が表示されます。
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>キャンセル</AlertDialogCancel>
+            <AlertDialogAction onClick={handleRepostConfirm}>
+              リポストする
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </article>
   );
 }

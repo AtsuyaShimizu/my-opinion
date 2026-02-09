@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { calculateConsensusScore } from "@/lib/utils/consensus";
 
 // GET /api/themes - List active themes
 export async function GET(request: NextRequest) {
@@ -26,38 +27,81 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // Get post counts and participant counts for each theme
-    const enrichedThemes = await Promise.all(
-      (themes ?? []).map(async (theme) => {
-        const { count: postCount } = await supabase
-          .from("theme_posts")
-          .select("*", { count: "exact", head: true })
-          .eq("theme_id", theme.id);
+    const themeList = themes ?? [];
+    if (themeList.length === 0) {
+      return NextResponse.json({ data: [], status: 200 });
+    }
 
-        // Get unique participant count
-        const { data: themePosts } = await supabase
-          .from("theme_posts")
-          .select("post_id")
-          .eq("theme_id", theme.id);
+    const themeIds = themeList.map((t) => t.id);
 
-        let participantCount = 0;
-        if (themePosts && themePosts.length > 0) {
-          const postIds = themePosts.map((tp) => tp.post_id);
-          const { data: posts } = await supabase
-            .from("posts")
-            .select("user_id")
-            .in("id", postIds);
-          const uniqueUsers = new Set(posts?.map((p) => p.user_id) ?? []);
-          participantCount = uniqueUsers.size;
-        }
+    // Batch: get all theme_posts for all themes at once
+    const { data: allThemePosts } = await supabase
+      .from("theme_posts")
+      .select("theme_id, post_id")
+      .in("theme_id", themeIds);
 
-        return {
-          ...theme,
-          postCount: postCount ?? 0,
-          participantCount,
-        };
-      })
-    );
+    // Group post IDs by theme
+    const themePostMap = new Map<string, string[]>();
+    for (const tp of allThemePosts ?? []) {
+      const posts = themePostMap.get(tp.theme_id) ?? [];
+      posts.push(tp.post_id);
+      themePostMap.set(tp.theme_id, posts);
+    }
+
+    // Collect all unique post IDs across all themes
+    const allPostIds = [...new Set((allThemePosts ?? []).map((tp) => tp.post_id))];
+
+    // Batch: get user_ids for participant counts + reactions for consensus scores
+    const [postsResult, reactionsResult] = await Promise.all([
+      allPostIds.length > 0
+        ? supabase.from("posts").select("id, user_id").in("id", allPostIds)
+        : Promise.resolve({ data: [] as { id: string; user_id: string }[] }),
+      allPostIds.length > 0
+        ? supabase.from("reactions").select("post_id, reaction_score").in("post_id", allPostIds)
+        : Promise.resolve({ data: [] as { post_id: string; reaction_score: number }[] }),
+    ]);
+
+    const postUserMap = new Map<string, string>();
+    for (const p of postsResult.data ?? []) {
+      postUserMap.set(p.id, p.user_id);
+    }
+
+    // Group reactions by post_id
+    const reactionsByPost = new Map<string, { reaction_score: number }[]>();
+    for (const r of reactionsResult.data ?? []) {
+      const list = reactionsByPost.get(r.post_id) ?? [];
+      list.push({ reaction_score: r.reaction_score });
+      reactionsByPost.set(r.post_id, list);
+    }
+
+    // Enrich each theme using pre-fetched data
+    const enrichedThemes = themeList.map((theme) => {
+      const postIds = themePostMap.get(theme.id) ?? [];
+      const postCount = postIds.length;
+
+      // Participant count
+      const uniqueUsers = new Set<string>();
+      for (const pid of postIds) {
+        const uid = postUserMap.get(pid);
+        if (uid) uniqueUsers.add(uid);
+      }
+      const participantCount = uniqueUsers.size;
+
+      // Consensus score
+      const themeReactions: { reaction_score: number }[] = [];
+      for (const pid of postIds) {
+        const reactions = reactionsByPost.get(pid);
+        if (reactions) themeReactions.push(...reactions);
+      }
+      const consensusScore = calculateConsensusScore(themeReactions);
+
+      return {
+        ...theme,
+        postCount,
+        participantCount,
+        consensusScore,
+      };
+    });
 
     return NextResponse.json({ data: enrichedThemes, status: 200 });
   } catch {

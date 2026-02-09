@@ -90,7 +90,7 @@ export default function AdminThemesPage() {
             <Button variant="ghost" size="icon" onClick={() => router.back()}>
               <ArrowLeft className="h-5 w-5" />
             </Button>
-            <h1 className="text-lg font-bold">テーマ管理</h1>
+            <h1 className="text-lg font-bold">トピック管理</h1>
           </div>
           <Button size="sm" className="gap-1" onClick={() => setCreateOpen(true)}>
             <Plus className="h-4 w-4" />
@@ -105,7 +105,7 @@ export default function AdminThemesPage() {
         </div>
       ) : themes.length === 0 ? (
         <div className="px-4 py-8 text-center text-sm text-muted-foreground">
-          テーマがありません
+          トピックがありません
         </div>
       ) : (
         <div className="divide-y">
@@ -117,10 +117,10 @@ export default function AdminThemesPage() {
                     <h2 className="font-semibold">{theme.title}</h2>
                     <span
                       className={cn(
-                        "rounded-full px-2 py-0.5 text-xs",
+                        "rounded-full px-2 py-0.5 text-[11px] font-medium",
                         theme.status === "active"
-                          ? "bg-green-100 text-green-700"
-                          : "bg-gray-100 text-gray-700"
+                          ? "bg-emerald-50/80 text-emerald-700 dark:bg-emerald-950/30 dark:text-emerald-400"
+                          : "bg-muted text-muted-foreground"
                       )}
                     >
                       {theme.status === "active" ? "アクティブ" : "終了"}
@@ -155,7 +155,7 @@ export default function AdminThemesPage() {
       <Dialog open={createOpen} onOpenChange={setCreateOpen}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>新しいテーマを作成</DialogTitle>
+            <DialogTitle>新しいトピックを作成</DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
             <div className="space-y-2">
@@ -165,7 +165,7 @@ export default function AdminThemesPage() {
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
                 maxLength={50}
-                placeholder="テーマのタイトル"
+                placeholder="トピックのタイトル"
               />
               <p className="text-xs text-muted-foreground">{title.length}/50</p>
             </div>
@@ -176,7 +176,7 @@ export default function AdminThemesPage() {
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
                 maxLength={500}
-                placeholder="テーマの説明"
+                placeholder="トピックの説明"
                 className="resize-none"
               />
               <p className="text-xs text-muted-foreground">{description.length}/500</p>

@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
-import { Loader2, ArrowLeft, Camera } from "lucide-react";
+import { Loader2, ArrowLeft, Camera, Check } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -236,7 +236,8 @@ export default function ProfileEditPage() {
 
   return (
     <div>
-      <div className="sticky top-14 z-40 border-b bg-background/95 backdrop-blur lg:top-0">
+      {/* Header */}
+      <div className="sticky top-14 z-40 border-b bg-background/80 backdrop-blur-lg lg:top-0">
         <div className="flex items-center justify-between px-4 py-3">
           <div className="flex items-center gap-3">
             <Button variant="ghost" size="icon" onClick={() => router.back()}>
@@ -244,15 +245,19 @@ export default function ProfileEditPage() {
             </Button>
             <h1 className="text-lg font-bold">プロフィール編集</h1>
           </div>
-          <Button onClick={handleSave} disabled={saving} size="sm">
-            {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+          <Button onClick={handleSave} disabled={saving} size="sm" className="rounded-full">
+            {saving ? (
+              <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />
+            ) : (
+              <Check className="mr-1.5 h-4 w-4" />
+            )}
             保存
           </Button>
         </div>
       </div>
 
       {successMessage && (
-        <div className="border-b bg-green-50 px-4 py-2 text-sm text-green-700">
+        <div className="border-b bg-primary/5 px-4 py-2.5 text-sm font-medium text-primary">
           {successMessage}
         </div>
       )}
@@ -265,7 +270,7 @@ export default function ProfileEditPage() {
             <button
               onClick={() => fileInputRef.current?.click()}
               disabled={uploadingAvatar}
-              className="absolute bottom-0 right-0 flex h-8 w-8 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-md"
+              className="absolute -bottom-1 -right-1 flex h-8 w-8 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-md transition-transform hover:scale-105"
             >
               {uploadingAvatar ? (
                 <Loader2 className="h-4 w-4 animate-spin" />
@@ -287,8 +292,10 @@ export default function ProfileEditPage() {
         </div>
 
         {/* Basic Info */}
-        <div className="space-y-4">
-          <h2 className="font-semibold">基本情報</h2>
+        <section className="space-y-4">
+          <h2 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+            基本情報
+          </h2>
           <div className="space-y-2">
             <Label htmlFor="displayName">ユーザー名（表示名）</Label>
             <Input
@@ -296,6 +303,7 @@ export default function ProfileEditPage() {
               value={displayName}
               onChange={(e) => setDisplayName(e.target.value)}
               maxLength={30}
+              className="rounded-lg"
             />
           </div>
           <div className="space-y-2">
@@ -305,107 +313,115 @@ export default function ProfileEditPage() {
               value={bio}
               onChange={(e) => setBio(e.target.value)}
               maxLength={160}
-              className="resize-none"
+              className="resize-none rounded-lg"
             />
-            <p className="text-xs text-muted-foreground">{bio.length}/160</p>
+            <p className="text-right text-xs text-muted-foreground">{bio.length}/160</p>
           </div>
-        </div>
+        </section>
 
         {/* Attributes */}
-        <div className="space-y-4">
-          <h2 className="font-semibold">属性情報</h2>
+        <section className="space-y-4">
+          <h2 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+            プロフィール情報
+          </h2>
           <p className="text-xs text-muted-foreground">
-            各属性の公開/非公開を切り替えられます。非公開にしても統計集計には利用されます。
+            各項目の公開/非公開を切り替えられます。非公開にしても統計集計には利用されます。
           </p>
 
-          <AttributeField
-            label="性別"
-            value={gender}
-            options={GENDER_OPTIONS}
-            onChange={(v) => setGender(v as Gender | null)}
-            isPublic={isGenderPublic}
-            onPublicChange={setIsGenderPublic}
-          />
+          <div className="space-y-4 rounded-xl border bg-card p-4">
+            <AttributeField
+              label="性別"
+              value={gender}
+              options={GENDER_OPTIONS}
+              onChange={(v) => setGender(v as Gender | null)}
+              isPublic={isGenderPublic}
+              onPublicChange={setIsGenderPublic}
+            />
 
-          <AttributeField
-            label="年齢帯"
-            value={ageRange}
-            options={AGE_RANGE_OPTIONS}
-            onChange={(v) => setAgeRange(v as AgeRange | null)}
-            isPublic={isAgeRangePublic}
-            onPublicChange={setIsAgeRangePublic}
-          />
+            <AttributeField
+              label="年齢帯"
+              value={ageRange}
+              options={AGE_RANGE_OPTIONS}
+              onChange={(v) => setAgeRange(v as AgeRange | null)}
+              isPublic={isAgeRangePublic}
+              onPublicChange={setIsAgeRangePublic}
+            />
 
-          <AttributeField
-            label="学歴"
-            value={education}
-            options={EDUCATION_OPTIONS}
-            onChange={(v) => setEducation(v as Education | null)}
-            isPublic={isEducationPublic}
-            onPublicChange={setIsEducationPublic}
-          />
+            <AttributeField
+              label="学歴"
+              value={education}
+              options={EDUCATION_OPTIONS}
+              onChange={(v) => setEducation(v as Education | null)}
+              isPublic={isEducationPublic}
+              onPublicChange={setIsEducationPublic}
+            />
 
-          <AttributeField
-            label="職業"
-            value={occupation}
-            options={OCCUPATION_OPTIONS}
-            onChange={(v) => setOccupation(v as Occupation | null)}
-            isPublic={isOccupationPublic}
-            onPublicChange={setIsOccupationPublic}
-          />
-        </div>
+            <AttributeField
+              label="職業"
+              value={occupation}
+              options={OCCUPATION_OPTIONS}
+              onChange={(v) => setOccupation(v as Occupation | null)}
+              isPublic={isOccupationPublic}
+              onPublicChange={setIsOccupationPublic}
+            />
+          </div>
+        </section>
 
         {/* Political Attributes */}
-        <div className="space-y-4">
-          <h2 className="font-semibold">政治スタンス</h2>
-          <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-800">
-            政治スタンス・支持政党は「要配慮個人情報」に該当します。公開設定の変更はいつでも可能です。
+        <section className="space-y-4">
+          <h2 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+            政治的な立場
+          </h2>
+          <div className="rounded-xl border border-amber-200/60 bg-amber-50/50 p-3 text-xs text-amber-800 dark:border-amber-800/40 dark:bg-amber-950/20 dark:text-amber-300">
+            政治的な立場・支持政党は「要配慮個人情報」に該当します。公開設定の変更はいつでも可能です。
           </div>
 
-          <AttributeField
-            label="支持政党"
-            value={politicalParty}
-            options={POLITICAL_PARTY_OPTIONS}
-            onChange={(v) => setPoliticalParty(v as PoliticalParty | null)}
-            isPublic={isPoliticalPartyPublic}
-            onPublicChange={setIsPoliticalPartyPublic}
-          />
+          <div className="space-y-4 rounded-xl border bg-card p-4">
+            <AttributeField
+              label="支持政党"
+              value={politicalParty}
+              options={POLITICAL_PARTY_OPTIONS}
+              onChange={(v) => setPoliticalParty(v as PoliticalParty | null)}
+              isPublic={isPoliticalPartyPublic}
+              onPublicChange={setIsPoliticalPartyPublic}
+            />
 
-          <div className="space-y-2">
-            <div className="flex items-center justify-between">
-              <Label>政治スタンス</Label>
-              <div className="flex items-center gap-2">
-                <span className="text-xs text-muted-foreground">
-                  {isPoliticalStancePublic ? "公開" : "非公開"}
-                </span>
-                <Switch
-                  checked={isPoliticalStancePublic}
-                  onCheckedChange={setIsPoliticalStancePublic}
-                />
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <Label>政治的な立場</Label>
+                <div className="flex items-center gap-2">
+                  <span className="text-xs text-muted-foreground">
+                    {isPoliticalStancePublic ? "公開" : "非公開"}
+                  </span>
+                  <Switch
+                    checked={isPoliticalStancePublic}
+                    onCheckedChange={setIsPoliticalStancePublic}
+                  />
+                </div>
+              </div>
+              <div className="flex items-center justify-between gap-1.5">
+                {POLITICAL_STANCE_OPTIONS.map((opt) => (
+                  <button
+                    key={opt.value}
+                    type="button"
+                    onClick={() =>
+                      setPoliticalStance(
+                        politicalStance === opt.value ? null : opt.value
+                      )
+                    }
+                    className={`flex-1 rounded-lg border px-2 py-2 text-xs font-medium transition-all duration-200 ${
+                      politicalStance === opt.value
+                        ? "border-primary bg-primary text-primary-foreground shadow-sm"
+                        : "border-border bg-background hover:bg-accent"
+                    }`}
+                  >
+                    {opt.label}
+                  </button>
+                ))}
               </div>
             </div>
-            <div className="flex items-center justify-between gap-2">
-              {POLITICAL_STANCE_OPTIONS.map((opt) => (
-                <button
-                  key={opt.value}
-                  type="button"
-                  onClick={() =>
-                    setPoliticalStance(
-                      politicalStance === opt.value ? null : opt.value
-                    )
-                  }
-                  className={`flex-1 rounded-md border px-2 py-2 text-xs transition-colors ${
-                    politicalStance === opt.value
-                      ? "border-primary bg-primary text-primary-foreground"
-                      : "border-border hover:bg-accent"
-                  }`}
-                >
-                  {opt.label}
-                </button>
-              ))}
-            </div>
           </div>
-        </div>
+        </section>
       </div>
     </div>
   );
@@ -441,7 +457,7 @@ function AttributeField({
         value={value ?? ""}
         onValueChange={(v) => onChange(v || null)}
       >
-        <SelectTrigger>
+        <SelectTrigger className="rounded-lg">
           <SelectValue placeholder="選択してください" />
         </SelectTrigger>
         <SelectContent>

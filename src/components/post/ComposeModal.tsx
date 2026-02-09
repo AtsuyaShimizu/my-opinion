@@ -1,22 +1,17 @@
 "use client";
 
-import { useState } from "react";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import { Button } from "@/components/ui/button";
-import { Textarea } from "@/components/ui/textarea";
-
-const MAX_LENGTH = 200;
+import { useState, useEffect } from "react";
+import { Dialog, DialogContent } from "@/components/ui/dialog";
+import { toast } from "sonner";
+import { ComposeForm } from "./ComposeForm";
 
 interface ComposeModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onSubmit?: (content: string) => void;
+  onSubmit?: (content: string, title?: string, themeId?: string) => void | Promise<void>;
   replyTo?: { id: string; author: string };
+  defaultThemeId?: string;
+  defaultThemeName?: string;
 }
 
 export function ComposeModal({
@@ -24,56 +19,43 @@ export function ComposeModal({
   onOpenChange,
   onSubmit,
   replyTo,
+  defaultThemeId,
+  defaultThemeName,
 }: ComposeModalProps) {
-  const [content, setContent] = useState("");
-  const remaining = MAX_LENGTH - content.length;
-  const isOverLimit = remaining < 0;
-  const isEmpty = content.trim().length === 0;
+  const [showSuccess, setShowSuccess] = useState(false);
 
-  function handleSubmit() {
-    if (isEmpty || isOverLimit) return;
-    onSubmit?.(content.trim());
-    setContent("");
-    onOpenChange(false);
+  useEffect(() => {
+    if (!open) {
+      setShowSuccess(false);
+    }
+  }, [open]);
+
+  async function handleSubmit(content: string, title?: string) {
+    try {
+      await onSubmit?.(content, title, defaultThemeId);
+    } catch {
+      toast.error("投稿に失敗しました");
+      throw new Error("submit failed");
+    }
   }
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-lg">
-        <DialogHeader>
-          <DialogTitle>
-            {replyTo ? `@${replyTo.author} に返信` : "新しい投稿"}
-          </DialogTitle>
-        </DialogHeader>
-        <div className="space-y-4">
-          <Textarea
-            placeholder={
-              replyTo ? "返信を入力..." : "いま何を考えていますか？"
-            }
-            value={content}
-            onChange={(e) => setContent(e.target.value)}
-            className="min-h-[120px] resize-none"
-          />
-          <div className="flex items-center justify-between">
-            <span
-              className={`text-sm ${
-                isOverLimit
-                  ? "text-destructive font-medium"
-                  : remaining <= 20
-                    ? "text-amber-600"
-                    : "text-muted-foreground"
-              }`}
-            >
-              {remaining}
-            </span>
-            <Button
-              onClick={handleSubmit}
-              disabled={isEmpty || isOverLimit}
-            >
-              {replyTo ? "返信する" : "投稿する"}
-            </Button>
-          </div>
-        </div>
+    <Dialog open={open} onOpenChange={(v) => { if (!showSuccess) onOpenChange(v); }}>
+      <DialogContent className="gap-0 overflow-hidden p-0 sm:max-w-lg sm:rounded-2xl" showCloseButton={!showSuccess}>
+        <ComposeForm
+          onSubmit={handleSubmit}
+          replyTo={replyTo}
+          defaultThemeName={defaultThemeName}
+          autoFocus={open}
+          minHeight={100}
+          onSuccess={() => {
+            setShowSuccess(true);
+            setTimeout(() => {
+              setShowSuccess(false);
+              onOpenChange(false);
+            }, 800);
+          }}
+        />
       </DialogContent>
     </Dialog>
   );

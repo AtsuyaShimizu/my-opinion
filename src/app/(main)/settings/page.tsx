@@ -12,6 +12,7 @@ import {
   Loader2,
   ChevronRight,
   AlertTriangle,
+  Ticket,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
@@ -27,7 +28,7 @@ export default function SettingsPage() {
 
   const [notifyReply, setNotifyReply] = useState(true);
   const [notifyFollow, setNotifyFollow] = useState(true);
-  const [notifyGood, setNotifyGood] = useState(true);
+  const [notifyReaction, setNotifyReaction] = useState(true);
   const [notifyTheme, setNotifyTheme] = useState(true);
   const [notifyAnalysis, setNotifyAnalysis] = useState(true);
 
@@ -57,7 +58,8 @@ export default function SettingsPage() {
 
   return (
     <div>
-      <div className="sticky top-14 z-40 border-b bg-background/95 backdrop-blur lg:top-0">
+      {/* Header */}
+      <div className="sticky top-14 z-40 border-b bg-background/80 backdrop-blur-lg lg:top-0">
         <div className="flex items-center gap-3 px-4 py-3">
           <Button variant="ghost" size="icon" onClick={() => router.back()}>
             <ArrowLeft className="h-5 w-5" />
@@ -66,76 +68,68 @@ export default function SettingsPage() {
         </div>
       </div>
 
+      {/* Account Section */}
+      <div className="px-4 pt-6 pb-2">
+        <h2 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+          アカウント
+        </h2>
+      </div>
       <div className="divide-y">
-        {/* Profile Edit Link */}
-        <Link
+        <SettingsLink
           href="/settings/profile"
-          className="flex items-center justify-between px-4 py-4 transition-colors hover:bg-accent/50"
-        >
-          <div className="flex items-center gap-3">
-            <User className="h-5 w-5 text-muted-foreground" />
-            <div>
-              <p className="text-sm font-medium">プロフィール編集</p>
-              <p className="text-xs text-muted-foreground">
-                表示名、自己紹介、属性情報の編集
-              </p>
-            </div>
-          </div>
-          <ChevronRight className="h-5 w-5 text-muted-foreground" />
-        </Link>
-
-        {/* Echo Chamber Link */}
-        <Link
+          icon={User}
+          title="プロフィール編集"
+          description="表示名、自己紹介、プロフィール情報の編集"
+        />
+        <SettingsLink
           href="/settings/echo-chamber"
-          className="flex items-center justify-between px-4 py-4 transition-colors hover:bg-accent/50"
-        >
-          <div className="flex items-center gap-3">
-            <Shield className="h-5 w-5 text-muted-foreground" />
-            <div>
-              <p className="text-sm font-medium">エコーチェンバー指標</p>
-              <p className="text-xs text-muted-foreground">
-                フォローの偏り度を確認
-              </p>
-            </div>
-          </div>
-          <ChevronRight className="h-5 w-5 text-muted-foreground" />
-        </Link>
+          icon={Shield}
+          title="視野のひろがり"
+          description="あなたの視野の広さをチェック"
+        />
+        <SettingsLink
+          href="/settings/invites"
+          icon={Ticket}
+          title="招待コード"
+          description="友人をMy Opinionに招待"
+        />
       </div>
 
       {/* Notification Settings */}
-      <div className="mt-6 px-4">
-        <div className="flex items-center gap-2 pb-3">
-          <Bell className="h-5 w-5 text-muted-foreground" />
-          <h2 className="font-semibold">通知設定</h2>
-        </div>
-        <div className="space-y-4 rounded-lg border p-4">
+      <div className="px-4 pt-8 pb-2">
+        <h2 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+          通知設定
+        </h2>
+      </div>
+      <div className="mx-4 rounded-xl border bg-card">
+        <div className="divide-y">
           <NotificationToggle
-            label="返信通知"
-            description="投稿に返信がついたとき"
+            label="返信がついたとき"
+            description="意見に返信がついたとき"
             checked={notifyReply}
             onCheckedChange={setNotifyReply}
           />
           <NotificationToggle
-            label="フォロー通知"
+            label="新しいフォロワーがついたとき"
             description="新しいフォロワーがついたとき"
             checked={notifyFollow}
             onCheckedChange={setNotifyFollow}
           />
           <NotificationToggle
-            label="Good通知"
-            description="投稿にGoodがついたとき"
-            checked={notifyGood}
-            onCheckedChange={setNotifyGood}
+            label="リアクションがついたとき"
+            description="意見にリアクションがついたとき"
+            checked={notifyReaction}
+            onCheckedChange={setNotifyReaction}
           />
           <NotificationToggle
-            label="テーマ開始通知"
-            description="新しいテーマが開始されたとき"
+            label="新しいトピックが始まったとき"
+            description="新しいトピックが始まったとき"
             checked={notifyTheme}
             onCheckedChange={setNotifyTheme}
           />
           <NotificationToggle
-            label="分析解放通知"
-            description="投稿の分析が閲覧可能になったとき"
+            label="分析が見られるようになったとき"
+            description="意見の分析が閲覧可能になったとき"
             checked={notifyAnalysis}
             onCheckedChange={setNotifyAnalysis}
           />
@@ -143,10 +137,10 @@ export default function SettingsPage() {
       </div>
 
       {/* Account Actions */}
-      <div className="mt-6 space-y-3 px-4 pb-8">
+      <div className="mt-8 space-y-3 px-4 pb-8">
         <Button
           variant="outline"
-          className="w-full justify-start gap-2"
+          className="w-full justify-start gap-2 rounded-xl"
           onClick={handleLogout}
           disabled={loggingOut}
         >
@@ -168,7 +162,7 @@ export default function SettingsPage() {
             アカウントを削除
           </Button>
         ) : (
-          <div className="rounded-lg border border-destructive/50 bg-destructive/5 p-4">
+          <div className="rounded-xl border border-destructive/30 bg-destructive/5 p-4">
             <p className="text-sm font-medium text-destructive">
               本当にアカウントを削除しますか？
             </p>
@@ -179,6 +173,7 @@ export default function SettingsPage() {
               <Button
                 variant="outline"
                 size="sm"
+                className="rounded-lg"
                 onClick={() => setShowWithdrawConfirm(false)}
               >
                 キャンセル
@@ -186,6 +181,7 @@ export default function SettingsPage() {
               <Button
                 variant="destructive"
                 size="sm"
+                className="rounded-lg"
                 onClick={handleWithdraw}
                 disabled={withdrawing}
               >
@@ -202,6 +198,36 @@ export default function SettingsPage() {
   );
 }
 
+function SettingsLink({
+  href,
+  icon: Icon,
+  title,
+  description,
+}: {
+  href: string;
+  icon: React.ComponentType<{ className?: string }>;
+  title: string;
+  description: string;
+}) {
+  return (
+    <Link
+      href={href}
+      className="flex items-center justify-between px-4 py-4 transition-colors duration-200 hover:bg-accent/50"
+    >
+      <div className="flex items-center gap-3">
+        <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-muted">
+          <Icon className="h-4.5 w-4.5 text-muted-foreground" />
+        </div>
+        <div>
+          <p className="text-sm font-medium">{title}</p>
+          <p className="text-xs text-muted-foreground">{description}</p>
+        </div>
+      </div>
+      <ChevronRight className="h-4 w-4 text-muted-foreground" />
+    </Link>
+  );
+}
+
 function NotificationToggle({
   label,
   description,
@@ -214,7 +240,7 @@ function NotificationToggle({
   onCheckedChange: (checked: boolean) => void;
 }) {
   return (
-    <div className="flex items-center justify-between">
+    <div className="flex items-center justify-between px-4 py-3">
       <div>
         <Label className="text-sm">{label}</Label>
         <p className="text-xs text-muted-foreground">{description}</p>

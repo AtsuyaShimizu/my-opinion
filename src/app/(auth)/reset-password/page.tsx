@@ -50,11 +50,13 @@ export default function ResetPasswordPage() {
 
   if (sent) {
     return (
-      <div className="space-y-6 text-center">
-        <CheckCircle className="mx-auto h-12 w-12 text-green-600" />
+      <div className="space-y-8 text-center">
+        <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-primary/10">
+          <CheckCircle className="h-8 w-8 text-primary" />
+        </div>
         <div>
-          <h1 className="text-2xl font-bold">メールを送信しました</h1>
-          <p className="mt-2 text-sm text-muted-foreground">
+          <h1 className="text-xl font-bold">メールを送信しました</h1>
+          <p className="mt-3 text-sm leading-relaxed text-muted-foreground">
             パスワードリセット用のリンクをメールで送信しました。メールをご確認ください。
           </p>
         </div>
@@ -69,10 +71,10 @@ export default function ResetPasswordPage() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-8">
       <div className="text-center">
-        <h1 className="text-2xl font-bold text-primary">My Opinion</h1>
-        <p className="mt-2 text-sm text-muted-foreground">
+        <h1 className="text-xl font-bold tracking-tight text-primary">My Opinion</h1>
+        <p className="mt-1 text-sm text-muted-foreground">
           パスワードをリセット
         </p>
       </div>

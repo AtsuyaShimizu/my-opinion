@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { createServiceClient } from "@/lib/supabase/service";
+import { extractPublicAttributes } from "@/lib/utils/attributes";
 
 // GET /api/users/:handle - Get user profile with public attributes
 export async function GET(
@@ -24,27 +26,15 @@ export async function GET(
       );
     }
 
-    // Get public attributes
-    // TODO: RLSにより user_attributes の SELECT は auth.uid() = user_id に制限されている。
-    // 他ユーザーの属性を取得するにはサービスロールクライアントを使用するか、
-    // 公開属性のみ読み取り可能なRLSポリシーを追加する必要がある。
-    const { data: attributes } = await supabase
+    // Get public attributes (use service client to bypass RLS restriction)
+    const serviceClient = createServiceClient();
+    const { data: attributes } = await serviceClient
       .from("user_attributes")
       .select("*")
       .eq("user_id", user.id)
       .single();
 
-    // Filter to only public attributes
-    const publicAttributes = attributes
-      ? {
-          gender: attributes.is_gender_public ? attributes.gender : null,
-          age_range: attributes.is_age_range_public ? attributes.age_range : null,
-          education: attributes.is_education_public ? attributes.education : null,
-          occupation: attributes.is_occupation_public ? attributes.occupation : null,
-          political_party: attributes.is_political_party_public ? attributes.political_party : null,
-          political_stance: attributes.is_political_stance_public ? attributes.political_stance : null,
-        }
-      : null;
+    const publicAttributes = extractPublicAttributes(attributes);
 
     // Get follower/following counts
     const [{ count: followerCount }, { count: followingCount }] = await Promise.all([
@@ -64,7 +54,8 @@ export async function GET(
     } = await supabase.auth.getUser();
 
     let isFollowing = false;
-    if (currentUser) {
+    const isOwnProfile = currentUser?.id === user.id;
+    if (currentUser && !isOwnProfile) {
       const { data: follow } = await supabase
         .from("follows")
         .select("id")
@@ -81,6 +72,7 @@ export async function GET(
         followerCount: followerCount ?? 0,
         followingCount: followingCount ?? 0,
         isFollowing,
+        isOwnProfile,
       },
       status: 200,
     });

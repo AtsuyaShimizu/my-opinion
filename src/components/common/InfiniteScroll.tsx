@@ -48,7 +48,12 @@ export function InfiniteScroll({
       <div ref={sentinelRef} className="h-px" />
       {isLoading && (
         <div className="flex justify-center py-8">
-          <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+          <Loader2 className="h-5 w-5 animate-spin text-muted-foreground/60" />
+        </div>
+      )}
+      {!hasMore && !isLoading && (
+        <div className="flex justify-center py-8">
+          <span className="text-xs text-muted-foreground/50">---</span>
         </div>
       )}
     </div>

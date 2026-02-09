@@ -1,7 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { enrichPostsWithAuthorAndReactions } from "@/lib/utils/enrichPosts";
 
 const DEFAULT_LIMIT = 20;
+const VALID_SORT = ["latest", "popular", "controversial"] as const;
+const VALID_FILTER_KEYS = ["gender", "age_range", "occupation", "political_stance"] as const;
 
 // GET /api/timeline/explore - Explore timeline (all public posts)
 export async function GET(request: NextRequest) {
@@ -9,19 +12,35 @@ export async function GET(request: NextRequest) {
     const supabase = await createClient();
     const { searchParams } = request.nextUrl;
     const cursor = searchParams.get("cursor");
+    const sort = VALID_SORT.includes(searchParams.get("sort") as typeof VALID_SORT[number])
+      ? (searchParams.get("sort") as typeof VALID_SORT[number])
+      : "latest";
     const limit = Math.min(
       parseInt(searchParams.get("limit") ?? String(DEFAULT_LIMIT), 10),
       50
     );
+
+    // Parse attribute filters
+    const filters: Record<string, string> = {};
+    for (const key of VALID_FILTER_KEYS) {
+      const val = searchParams.get(key);
+      if (val) filters[key] = val;
+    }
+    const hasFilters = Object.keys(filters).length > 0;
+
+    // TODO: popular/controversial/フィルタ使用時は最大200件を取得してインメモリ処理している。
+    // 投稿数が増えた場合、DBレベルでのJOIN+ソートやマテリアライズドビューへの移行を検討すること。
+    const needsInMemorySort = sort === "popular" || sort === "controversial" || hasFilters;
+    const fetchLimit = needsInMemorySort ? 200 : limit + 1;
 
     let query = supabase
       .from("posts")
       .select("*")
       .is("parent_post_id", null)
       .order("created_at", { ascending: false })
-      .limit(limit + 1);
+      .limit(fetchLimit);
 
-    if (cursor) {
+    if (cursor && !needsInMemorySort) {
       query = query.lt("created_at", cursor);
     }
 
@@ -34,89 +53,63 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const hasMore = (posts?.length ?? 0) > limit;
-    const items = hasMore ? posts!.slice(0, limit) : (posts ?? []);
-    const nextCursor = hasMore ? items[items.length - 1].created_at : null;
-
-    // Enrich with author info
-    const userIds = [...new Set(items.map((p) => p.user_id))];
-    const postIds = items.map((p) => p.id);
-
-    // TODO: RLSにより user_attributes の SELECT は auth.uid() = user_id に制限されている。
-    // 他ユーザーの属性を取得するにはサービスロールクライアントを使用するか、
-    // 公開属性のみ読み取り可能なRLSポリシーを追加する必要がある。
-    const [usersResult, attributesResult, reactionsResult] = await Promise.all([
-      supabase
-        .from("users")
-        .select("id, user_handle, display_name, avatar_url")
-        .in("id", userIds.length > 0 ? userIds : ["__none__"]),
-      supabase
-        .from("user_attributes")
-        .select("*")
-        .in("user_id", userIds.length > 0 ? userIds : ["__none__"]),
-      supabase
-        .from("reactions")
-        .select("post_id, reaction_type")
-        .in("post_id", postIds.length > 0 ? postIds : ["__none__"]),
-    ]);
-
-    const userMap = new Map(usersResult.data?.map((u) => [u.id, u]) ?? []);
-    const attrMap = new Map(attributesResult.data?.map((a) => [a.user_id, a]) ?? []);
-
-    const reactionCounts = new Map<string, { good: number; bad: number }>();
-    for (const r of reactionsResult.data ?? []) {
-      const counts = reactionCounts.get(r.post_id) ?? { good: 0, bad: 0 };
-      if (r.reaction_type === "good") counts.good++;
-      else counts.bad++;
-      reactionCounts.set(r.post_id, counts);
-    }
-
-    // Get current user's reactions if authenticated
     const {
       data: { user: currentUser },
     } = await supabase.auth.getUser();
 
-    let userReactionMap = new Map<string, string>();
-    if (currentUser) {
-      const { data: userReactions } = await supabase
-        .from("reactions")
-        .select("post_id, reaction_type")
-        .eq("user_id", currentUser.id)
-        .in("post_id", postIds.length > 0 ? postIds : ["__none__"]);
-      userReactionMap = new Map(
-        userReactions?.map((r) => [r.post_id, r.reaction_type]) ?? []
-      );
+    let enrichedPosts = await enrichPostsWithAuthorAndReactions(
+      supabase,
+      posts ?? [],
+      currentUser?.id ?? null
+    );
+
+    // Apply attribute filters
+    if (hasFilters) {
+      enrichedPosts = enrichedPosts.filter((post) => {
+        if (!post.author?.attributes) return false;
+        const attrs = post.author.attributes as Record<string, string | null>;
+        return Object.entries(filters).every(
+          ([key, val]) => attrs[key] === val
+        );
+      });
     }
 
-    const enrichedPosts = items.map((post) => {
-      const author = userMap.get(post.user_id);
-      const attrs = attrMap.get(post.user_id);
-      const counts = reactionCounts.get(post.id) ?? { good: 0, bad: 0 };
-      const publicAttributes = attrs
-        ? {
-            gender: attrs.is_gender_public ? attrs.gender : null,
-            age_range: attrs.is_age_range_public ? attrs.age_range : null,
-            education: attrs.is_education_public ? attrs.education : null,
-            occupation: attrs.is_occupation_public ? attrs.occupation : null,
-            political_party: attrs.is_political_party_public ? attrs.political_party : null,
-            political_stance: attrs.is_political_stance_public ? attrs.political_stance : null,
-          }
-        : null;
+    // Sort by popularity if requested (by reaction count, then by average score)
+    if (sort === "popular") {
+      enrichedPosts.sort((a, b) => b.reactionCount - a.reactionCount || (b.averageScore ?? 0) - (a.averageScore ?? 0));
+    }
 
-      return {
-        ...post,
-        author: author ? { ...author, attributes: publicAttributes } : null,
-        goodCount: counts.good,
-        badCount: currentUser?.id === post.user_id ? counts.bad : undefined,
-        currentUserReaction: userReactionMap.get(post.id) ?? null,
-      };
-    });
+    // Sort by controversy: averageScore close to 50 + high reactionCount
+    if (sort === "controversial") {
+      enrichedPosts.sort((a, b) => {
+        const aScore = a.reactionCount * (1 - Math.abs((a.averageScore ?? 50) - 50) / 50);
+        const bScore = b.reactionCount * (1 - Math.abs((b.averageScore ?? 50) - 50) / 50);
+        return bScore - aScore;
+      });
+    }
+
+    // Paginate (cursor-based for popular/controversial/filtered uses offset)
+    const cursorOffset = cursor ? parseInt(cursor, 10) : 0;
+    if (needsInMemorySort) {
+      enrichedPosts = enrichedPosts.slice(cursorOffset, cursorOffset + limit);
+    } else {
+      // Already paginated via DB cursor for latest
+      const dbHasMore = (posts?.length ?? 0) > limit;
+      enrichedPosts = dbHasMore ? enrichedPosts.slice(0, limit) : enrichedPosts;
+    }
+
+    const resultHasMore = needsInMemorySort
+      ? enrichedPosts.length === limit
+      : (posts?.length ?? 0) > limit;
+    const resultNextCursor = needsInMemorySort
+      ? (resultHasMore ? String(cursorOffset + limit) : null)
+      : (resultHasMore ? enrichedPosts[enrichedPosts.length - 1]?.created_at ?? null : null);
 
     return NextResponse.json({
       data: {
         items: enrichedPosts,
-        nextCursor,
-        hasMore,
+        nextCursor: resultNextCursor,
+        hasMore: resultHasMore,
       },
       status: 200,
     });

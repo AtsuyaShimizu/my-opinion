@@ -28,9 +28,9 @@ const REASON_LABELS: Record<string, string> = {
 };
 
 const STATUS_LABELS: Record<string, { label: string; color: string }> = {
-  pending: { label: "未対応", color: "bg-amber-100 text-amber-700" },
-  reviewed: { label: "確認中", color: "bg-blue-100 text-blue-700" },
-  resolved: { label: "対応済み", color: "bg-green-100 text-green-700" },
+  pending: { label: "未対応", color: "bg-amber-50/80 text-amber-700 dark:bg-amber-950/30 dark:text-amber-400" },
+  reviewed: { label: "確認中", color: "bg-sky-50/80 text-sky-700 dark:bg-sky-950/30 dark:text-sky-400" },
+  resolved: { label: "対応済み", color: "bg-emerald-50/80 text-emerald-700 dark:bg-emerald-950/30 dark:text-emerald-400" },
 };
 
 function formatDate(dateStr: string): string {

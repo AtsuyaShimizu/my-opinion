@@ -92,7 +92,7 @@ export default function AdminInvitesPage() {
               </h2>
               <Button variant="outline" size="sm" onClick={handleCopyAll}>
                 {copiedId === "all" ? (
-                  <Check className="mr-1 h-3 w-3 text-green-600" />
+                  <Check className="mr-1 h-3 w-3 text-primary" />
                 ) : (
                   <Copy className="mr-1 h-3 w-3" />
                 )}
@@ -114,7 +114,7 @@ export default function AdminInvitesPage() {
                     onClick={() => handleCopy(code.code, code.id)}
                   >
                     {copiedId === code.id ? (
-                      <Check className="h-4 w-4 text-green-600" />
+                      <Check className="h-4 w-4 text-primary" />
                     ) : (
                       <Copy className="h-4 w-4" />
                     )}

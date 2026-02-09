@@ -10,6 +10,7 @@ const protectedRoutes = [
   "/admin",
   "/notifications",
   "/onboarding",
+  "/profile",
 ];
 
 // Routes that should redirect to /home if already authenticated

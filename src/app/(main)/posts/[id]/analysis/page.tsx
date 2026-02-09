@@ -4,30 +4,19 @@ import { useState, useEffect, use } from "react";
 import { useRouter } from "next/navigation";
 import { Loader2, ArrowLeft, Share2 } from "lucide-react";
 import {
-  PieChart,
-  Pie,
-  Cell,
   BarChart,
   Bar,
   XAxis,
   YAxis,
   Tooltip,
   ResponsiveContainer,
-  Legend,
+  Cell,
 } from "recharts";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/common/EmptyState";
 import { apiFetch } from "@/lib/api/client";
+import { ATTRIBUTE_LABELS_SHORT } from "@/lib/constants";
 import Link from "next/link";
-
-const ATTRIBUTE_LABELS: Record<string, Record<string, string>> = {
-  gender: { male: "男性", female: "女性", other: "その他", no_answer: "回答しない" },
-  age_range: { "18-24": "18-24歳", "25-29": "25-29歳", "30-34": "30-34歳", "35-39": "35-39歳", "40-44": "40-44歳", "45-49": "45-49歳", "50-54": "50-54歳", "55-59": "55-59歳", "60-64": "60-64歳", "65_and_over": "65歳以上" },
-  education: { junior_high: "中学校卒", high_school: "高校卒", vocational: "専門学校卒", junior_college: "短大卒", university: "大学卒", masters: "修士", doctorate: "博士", other: "その他" },
-  occupation: { company_employee: "会社員", civil_servant: "公務員", self_employed: "自営業", executive: "経営者", professional: "専門職", educator_researcher: "教育・研究職", student: "学生", homemaker: "主婦・主夫", part_time: "パート", unemployed: "無職", retired: "退職者", other: "その他" },
-  political_party: { ldp: "自民党", cdp: "立憲", nippon_ishin: "維新", komeito: "公明", dpfp: "国民", jcp: "共産", reiwa: "れいわ", sdp: "社民", sanseito: "参政", other: "その他", no_party: "なし", no_answer: "無回答" },
-  political_stance: { left: "左派", center_left: "やや左派", center: "中道", center_right: "やや右派", right: "右派" },
-};
 
 const ATTRIBUTE_SECTION_LABELS: Record<string, string> = {
   gender: "性別",
@@ -35,25 +24,37 @@ const ATTRIBUTE_SECTION_LABELS: Record<string, string> = {
   education: "学歴",
   occupation: "職業",
   political_party: "支持政党",
-  political_stance: "政治スタンス",
+  political_stance: "政治的な立場",
 };
 
-const PIE_COLORS = ["#3b82f6", "#ef4444"];
-const BAR_COLORS = ["#3b82f6", "#60a5fa", "#93c5fd", "#2563eb", "#1d4ed8", "#1e40af", "#6366f1", "#818cf8"];
+// Score distribution bin colors (rose -> amber -> emerald)
+const BIN_COLORS = ["#fb7185", "#f59e0b", "#fcd34d", "#6ee7b7", "#34d399"];
+
+// Muted distinguishable bar colors for attribute distribution
+const BAR_COLORS = ["#5d8a9a", "#7a9e7e", "#c4a862", "#b07060", "#8e7ea0", "#6a8fa0", "#9eab72", "#b08870"];
+
+interface ScoreDistributionBin {
+  range: string;
+  count: number;
+}
 
 interface AnalysisData {
   available: boolean;
   totalReactions: number;
   remainingForAnalysis?: number;
   message?: string;
-  goodBadRatio?: {
-    good: number;
-    bad: number;
-    goodRate: number;
-    badRate: number;
-  };
+  averageScore?: number;
+  scoreDistribution?: ScoreDistributionBin[];
   attributeDistribution?: Record<string, Record<string, number>>;
-  crossTabulation?: Record<string, Record<string, { good: number; bad: number }>>;
+  crossTabulation?: Record<string, Record<string, { count: number; averageScore: number }>>;
+}
+
+function scoreToColor(score: number): string {
+  if (score <= 20) return "#fb7185";
+  if (score <= 40) return "#f59e0b";
+  if (score <= 60) return "#fcd34d";
+  if (score <= 80) return "#6ee7b7";
+  return "#34d399";
 }
 
 export default function AnalysisPage({
@@ -101,7 +102,7 @@ export default function AnalysisPage({
             <Button variant="ghost" size="icon" onClick={() => router.back()}>
               <ArrowLeft className="h-5 w-5" />
             </Button>
-            <h1 className="text-lg font-bold">投稿分析</h1>
+            <h1 className="text-lg font-bold">レスポンス分析</h1>
           </div>
           {data.available && (
             <Button variant="outline" size="sm" className="gap-2" asChild>
@@ -120,7 +121,7 @@ export default function AnalysisPage({
             {data.totalReactions}
           </p>
           <p className="mt-2 text-sm text-muted-foreground">
-            / 20 評価
+            / 20 リアクション
           </p>
           <div className="mx-auto mt-4 h-2 max-w-xs rounded-full bg-muted">
             <div
@@ -134,59 +135,61 @@ export default function AnalysisPage({
         </div>
       ) : (
         <div className="space-y-8 px-4 py-6">
-          {/* Good/Bad Ratio */}
-          <section>
-            <h2 className="mb-4 font-semibold">Good/Bad 比率</h2>
-            <div className="flex items-center gap-6">
-              <div className="h-48 w-48">
+          {/* Average Score Summary */}
+          <section className="text-center">
+            <p className="text-5xl font-bold tracking-tight text-primary">
+              {data.averageScore}
+            </p>
+            <p className="mt-1 text-sm text-muted-foreground">
+              平均スコア ({data.totalReactions}件のリアクション)
+            </p>
+          </section>
+
+          {/* Score Distribution Histogram */}
+          {data.scoreDistribution && (
+            <section>
+              <h2 className="mb-4 text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                スコア分布
+              </h2>
+              <div className="h-48">
                 <ResponsiveContainer width="100%" height="100%">
-                  <PieChart>
-                    <Pie
-                      data={[
-                        { name: "Good", value: data.goodBadRatio!.good },
-                        { name: "Bad", value: data.goodBadRatio!.bad },
-                      ]}
-                      cx="50%"
-                      cy="50%"
-                      innerRadius={40}
-                      outerRadius={70}
-                      dataKey="value"
-                    >
-                      {PIE_COLORS.map((color, i) => (
-                        <Cell key={i} fill={color} />
+                  <BarChart data={data.scoreDistribution}>
+                    <XAxis
+                      dataKey="range"
+                      tick={{ fontSize: 12 }}
+                    />
+                    <YAxis
+                      tick={{ fontSize: 12 }}
+                      allowDecimals={false}
+                    />
+                    <Tooltip
+                      formatter={(value) => [`${value}件`, "リアクション数"]}
+                    />
+                    <Bar dataKey="count" name="件数" radius={[4, 4, 0, 0]}>
+                      {data.scoreDistribution.map((_, i) => (
+                        <Cell key={i} fill={BIN_COLORS[i]} />
                       ))}
-                    </Pie>
-                    <Tooltip />
-                    <Legend />
-                  </PieChart>
+                    </Bar>
+                  </BarChart>
                 </ResponsiveContainer>
               </div>
-              <div className="space-y-2">
-                <div className="flex items-center gap-2">
-                  <div className="h-3 w-3 rounded-full bg-blue-500" />
-                  <span className="text-sm">Good: {data.goodBadRatio!.goodRate}% ({data.goodBadRatio!.good})</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <div className="h-3 w-3 rounded-full bg-red-500" />
-                  <span className="text-sm">Bad: {data.goodBadRatio!.badRate}% ({data.goodBadRatio!.bad})</span>
-                </div>
-                <p className="text-xs text-muted-foreground">
-                  合計 {data.totalReactions} 件の評価
-                </p>
+              <div className="mt-2 flex justify-between text-xs text-muted-foreground">
+                <span>異論</span>
+                <span>共感</span>
               </div>
-            </div>
-          </section>
+            </section>
+          )}
 
           {/* Attribute Distribution */}
           {data.attributeDistribution && (
             <section>
-              <h2 className="mb-4 font-semibold">閲覧者属性分布</h2>
+              <h2 className="mb-4 text-xs font-medium uppercase tracking-wider text-muted-foreground">読み手のプロフィール分布</h2>
               <div className="space-y-6">
                 {Object.entries(data.attributeDistribution).map(
                   ([attrKey, values]) => {
                     const chartData = Object.entries(values).map(
                       ([val, count]) => ({
-                        name: ATTRIBUTE_LABELS[attrKey]?.[val] ?? val,
+                        name: ATTRIBUTE_LABELS_SHORT[attrKey]?.[val] ?? val,
                         count,
                       })
                     );
@@ -226,18 +229,18 @@ export default function AnalysisPage({
             </section>
           )}
 
-          {/* Cross Tabulation */}
+          {/* Cross Tabulation - Average Score per attribute */}
           {data.crossTabulation && (
             <section>
-              <h2 className="mb-4 font-semibold">属性 x 評価 クロス集計</h2>
+              <h2 className="mb-4 text-xs font-medium uppercase tracking-wider text-muted-foreground">立場 x スコア の内訳</h2>
               <div className="space-y-6">
                 {Object.entries(data.crossTabulation).map(
                   ([attrKey, values]) => {
                     const chartData = Object.entries(values).map(
-                      ([val, counts]) => ({
-                        name: ATTRIBUTE_LABELS[attrKey]?.[val] ?? val,
-                        Good: counts.good,
-                        Bad: counts.bad,
+                      ([val, stats]) => ({
+                        name: ATTRIBUTE_LABELS_SHORT[attrKey]?.[val] ?? val,
+                        averageScore: stats.averageScore,
+                        count: stats.count,
                       })
                     );
                     if (chartData.length === 0) return null;
@@ -249,25 +252,30 @@ export default function AnalysisPage({
                         <div className="h-40">
                           <ResponsiveContainer width="100%" height="100%">
                             <BarChart data={chartData} layout="vertical">
-                              <XAxis type="number" />
+                              <XAxis
+                                type="number"
+                                domain={[0, 100]}
+                                tick={{ fontSize: 12 }}
+                              />
                               <YAxis
                                 type="category"
                                 dataKey="name"
                                 width={80}
                                 tick={{ fontSize: 12 }}
                               />
-                              <Tooltip />
-                              <Legend />
-                              <Bar
-                                dataKey="Good"
-                                stackId="a"
-                                fill="#3b82f6"
+                              <Tooltip
+                                formatter={(value, _name, props) =>
+                                  [`平均 ${value} (${(props.payload as { count: number }).count}件)`, "スコア"]
+                                }
                               />
-                              <Bar
-                                dataKey="Bad"
-                                stackId="a"
-                                fill="#ef4444"
-                              />
+                              <Bar dataKey="averageScore" name="平均スコア">
+                                {chartData.map((entry, i) => (
+                                  <Cell
+                                    key={i}
+                                    fill={scoreToColor(entry.averageScore)}
+                                  />
+                                ))}
+                              </Bar>
                             </BarChart>
                           </ResponsiveContainer>
                         </div>
