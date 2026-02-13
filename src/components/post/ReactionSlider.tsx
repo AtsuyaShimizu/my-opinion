@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useCallback, useEffect } from "react";
+import { useState, useRef, useCallback } from "react";
 import { cn } from "@/lib/utils";
 
 interface ReactionSliderProps {
@@ -22,17 +22,10 @@ export function ReactionSlider({
 }: ReactionSliderProps) {
   const trackRef = useRef<HTMLDivElement>(null);
   const [isDragging, setIsDragging] = useState(false);
-  const [localValue, setLocalValue] = useState<number | null>(value);
+  const [dragValue, setDragValue] = useState<number | null>(null);
   const [showPopup, setShowPopup] = useState(false);
   const lastTapRef = useRef<number>(0);
   const valueBeforeDragRef = useRef<number | null>(null);
-
-  // Sync external value
-  useEffect(() => {
-    if (!isDragging) {
-      setLocalValue(value);
-    }
-  }, [value, isDragging]);
 
   const clampScore = (n: number) => Math.round(Math.max(0, Math.min(100, n)));
 
@@ -51,22 +44,24 @@ export function ReactionSlider({
     (e: React.PointerEvent) => {
       if (disabled) return;
       e.preventDefault();
-      (e.target as HTMLElement).setPointerCapture(e.pointerId);
+      if (trackRef.current) {
+        trackRef.current.setPointerCapture(e.pointerId);
+      }
 
       const score = getScoreFromPosition(e.clientX);
-      valueBeforeDragRef.current = localValue;
-      setLocalValue(score);
+      valueBeforeDragRef.current = value;
+      setDragValue(score);
       setIsDragging(true);
       setShowPopup(true);
     },
-    [disabled, getScoreFromPosition, localValue]
+    [disabled, getScoreFromPosition, value]
   );
 
   const handlePointerMove = useCallback(
     (e: React.PointerEvent) => {
       if (!isDragging) return;
       const score = getScoreFromPosition(e.clientX);
-      setLocalValue(score);
+      setDragValue(score);
     },
     [isDragging, getScoreFromPosition]
   );
@@ -74,14 +69,18 @@ export function ReactionSlider({
   const handlePointerUp = useCallback(
     (e: React.PointerEvent) => {
       if (!isDragging) return;
-      (e.target as HTMLElement).releasePointerCapture(e.pointerId);
+      if (trackRef.current?.hasPointerCapture(e.pointerId)) {
+        trackRef.current.releasePointerCapture(e.pointerId);
+      }
+      const finalValue = dragValue ?? value;
       setIsDragging(false);
       setShowPopup(false);
-      if (localValue !== null) {
-        onChange?.(localValue);
+      setDragValue(null);
+      if (finalValue !== null) {
+        onChange?.(finalValue);
       }
     },
-    [isDragging, localValue, onChange]
+    [isDragging, dragValue, value, onChange]
   );
 
   const handleDoubleClick = useCallback(() => {
@@ -106,18 +105,21 @@ export function ReactionSlider({
       // Normal drag start
       e.stopPropagation();
       e.preventDefault();
-      (e.target as HTMLElement).setPointerCapture(e.pointerId);
-      valueBeforeDragRef.current = localValue;
+      if (trackRef.current) {
+        trackRef.current.setPointerCapture(e.pointerId);
+      }
+      valueBeforeDragRef.current = value;
+      setDragValue(value);
       setIsDragging(true);
       setShowPopup(true);
     },
-    [disabled, localValue, handleDoubleClick]
+    [disabled, value, handleDoubleClick]
   );
 
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent) => {
       if (disabled) return;
-      const current = localValue ?? 50;
+      const current = isDragging ? (dragValue ?? 50) : (value ?? 50);
 
       switch (e.key) {
         case "ArrowRight":
@@ -125,7 +127,7 @@ export function ReactionSlider({
           e.preventDefault();
           {
             const next = clampScore(current + 5);
-            setLocalValue(next);
+            setDragValue(next);
             onChange?.(next);
           }
           break;
@@ -134,14 +136,14 @@ export function ReactionSlider({
           e.preventDefault();
           {
             const next = clampScore(current - 5);
-            setLocalValue(next);
+            setDragValue(next);
             onChange?.(next);
           }
           break;
         case "Escape":
           e.preventDefault();
           if (isDragging) {
-            setLocalValue(valueBeforeDragRef.current);
+            setDragValue(valueBeforeDragRef.current);
             setIsDragging(false);
             setShowPopup(false);
           }
@@ -149,8 +151,8 @@ export function ReactionSlider({
         case "Enter":
         case " ":
           e.preventDefault();
-          if (localValue !== null) {
-            onChange?.(localValue);
+          if (current !== null) {
+            onChange?.(current);
           }
           break;
         case "Delete":
@@ -162,10 +164,10 @@ export function ReactionSlider({
           break;
       }
     },
-    [disabled, localValue, value, isDragging, onChange, onRemove]
+    [disabled, dragValue, value, isDragging, onChange, onRemove]
   );
 
-  const displayValue = localValue;
+  const displayValue = isDragging ? dragValue : value;
   const hasReaction = displayValue !== null;
 
   // Build the gradient for the filled portion

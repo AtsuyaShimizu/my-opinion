@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { Loader2, ArrowLeft, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -34,7 +34,7 @@ export default function AdminUsersPage() {
   const [statusFilter, setStatusFilter] = useState<string>("");
   const [updatingId, setUpdatingId] = useState<string | null>(null);
 
-  function fetchUsers() {
+  const fetchUsers = useCallback(() => {
     setLoading(true);
     const params = new URLSearchParams();
     if (search) params.set("search", search);
@@ -44,11 +44,11 @@ export default function AdminUsersPage() {
       .then((data) => setUsers(data.users))
       .catch(() => setUsers([]))
       .finally(() => setLoading(false));
-  }
+  }, [search, statusFilter]);
 
   useEffect(() => {
     fetchUsers();
-  }, [statusFilter]);
+  }, [fetchUsers]);
 
   async function handleStatusChange(userId: string, newStatus: string) {
     setUpdatingId(userId);

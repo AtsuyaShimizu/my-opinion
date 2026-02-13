@@ -6,7 +6,6 @@ import Link from "next/link";
 import {
   ArrowLeft,
   User,
-  Bell,
   Shield,
   LogOut,
   Loader2,

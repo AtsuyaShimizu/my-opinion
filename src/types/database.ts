@@ -93,6 +93,9 @@ export type NotificationType =
 /** テーマステータス */
 export type ThemeStatus = 'active' | 'ended';
 
+/** データソース種別 */
+export type SourceType = 'internal' | 'x';
+
 /** 通報対象タイプ */
 export type ReportTargetType = 'post' | 'user';
 
@@ -131,6 +134,27 @@ export type ReactorAttributeSnapshot = {
   occupation?: Occupation | null;
   political_party?: PoliticalParty | null;
   political_stance?: PoliticalStance | null;
+};
+
+/** 属性推定情報（推定であることを明示） */
+export type AttributeInference = {
+  inferred_label: string;
+  confidence: number;
+  method: 'self_reported' | 'heuristic' | 'llm' | 'unknown';
+  disclaimer?: string;
+};
+
+/** データ由来情報 */
+export type DataProvenance = {
+  source: SourceType;
+  fetched_at: string;
+  query: string;
+  confidence?: number;
+  policy_flags?: {
+    text_visible: boolean;
+    attribution_required: boolean;
+    external_link_required: boolean;
+  };
 };
 
 // -------------------------------------------------------------
@@ -232,6 +256,72 @@ export type ThemePost = {
   id: string;
   theme_id: string;
   post_id: string;
+};
+
+/** x_issues テーブル */
+export type XIssue = {
+  id: string;
+  source_issue_id: string | null;
+  source_type: SourceType;
+  title: string;
+  description: string | null;
+  query: string;
+  source_metadata: Record<string, unknown> | null;
+  is_active: boolean;
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+/** x_issue_posts テーブル */
+export type XIssuePost = {
+  id: string;
+  issue_id: string;
+  source_type: SourceType;
+  source_post_id: string;
+  author_handle: string;
+  author_display_name: string | null;
+  content: string | null;
+  url: string | null;
+  language: string | null;
+  posted_at: string;
+  like_count: number;
+  reply_count: number;
+  repost_count: number;
+  quote_count: number;
+  bookmark_count: number;
+  view_count: number;
+  stance_score: number | null;
+  inferred_attributes: AttributeInference[] | null;
+  inference_confidence: number | null;
+  data_provenance: DataProvenance | null;
+  raw_payload: Record<string, unknown> | null;
+  fetched_at: string;
+  created_at: string;
+};
+
+/** user_issue_stances テーブル */
+export type UserIssueStance = {
+  id: string;
+  user_id: string;
+  issue_id: string;
+  stance_score: number;
+  confidence: number | null;
+  note: string | null;
+  source_type: SourceType;
+  created_at: string;
+  updated_at: string;
+};
+
+/** user_issue_stance_events テーブル */
+export type UserIssueStanceEvent = {
+  id: string;
+  user_id: string;
+  issue_id: string;
+  stance_score: number;
+  confidence: number | null;
+  source_type: SourceType;
+  created_at: string;
 };
 
 /** notifications テーブル */
@@ -361,6 +451,62 @@ export type ThemePostInsert = {
   post_id: string;
 };
 
+export type XIssueInsert = {
+  id?: string;
+  source_issue_id?: string | null;
+  source_type?: SourceType;
+  title: string;
+  description?: string | null;
+  query: string;
+  source_metadata?: Record<string, unknown> | null;
+  is_active?: boolean;
+  created_by?: string | null;
+};
+
+export type XIssuePostInsert = {
+  id?: string;
+  issue_id: string;
+  source_type?: SourceType;
+  source_post_id: string;
+  author_handle: string;
+  author_display_name?: string | null;
+  content?: string | null;
+  url?: string | null;
+  language?: string | null;
+  posted_at: string;
+  like_count?: number;
+  reply_count?: number;
+  repost_count?: number;
+  quote_count?: number;
+  bookmark_count?: number;
+  view_count?: number;
+  stance_score?: number | null;
+  inferred_attributes?: AttributeInference[] | null;
+  inference_confidence?: number | null;
+  data_provenance?: DataProvenance | null;
+  raw_payload?: Record<string, unknown> | null;
+  fetched_at?: string;
+};
+
+export type UserIssueStanceInsert = {
+  id?: string;
+  user_id: string;
+  issue_id: string;
+  stance_score: number;
+  confidence?: number | null;
+  note?: string | null;
+  source_type?: SourceType;
+};
+
+export type UserIssueStanceEventInsert = {
+  id?: string;
+  user_id: string;
+  issue_id: string;
+  stance_score: number;
+  confidence?: number | null;
+  source_type?: SourceType;
+};
+
 export type NotificationInsert = {
   id?: string;
   user_id: string;
@@ -410,6 +556,8 @@ export type PostUpdate = Partial<Pick<Post, 'content' | 'title'>>;
 export type NotificationUpdate = Partial<Pick<Notification, 'is_read'>>;
 export type ReportUpdate = Partial<Pick<Report, 'status' | 'reviewed_by' | 'resolved_at'>>;
 export type ThemeUpdate = Partial<Omit<Theme, 'id' | 'created_by' | 'created_at' | 'updated_at'>>;
+export type XIssueUpdate = Partial<Omit<XIssue, 'id' | 'created_at'>>;
+export type UserIssueStanceUpdate = Partial<Pick<UserIssueStance, 'stance_score' | 'confidence' | 'note' | 'source_type'>>;
 
 // -------------------------------------------------------------
 // Supabase Database 型定義（supabase-js 向け）
@@ -463,6 +611,30 @@ export type Database = {
       theme_posts: {
         Row: ThemePost;
         Insert: ThemePostInsert;
+        Update: Record<string, unknown>;
+        Relationships: [];
+      };
+      x_issues: {
+        Row: XIssue;
+        Insert: XIssueInsert;
+        Update: XIssueUpdate;
+        Relationships: [];
+      };
+      x_issue_posts: {
+        Row: XIssuePost;
+        Insert: XIssuePostInsert;
+        Update: Partial<Omit<XIssuePost, 'id' | 'issue_id' | 'source_post_id' | 'created_at'>>;
+        Relationships: [];
+      };
+      user_issue_stances: {
+        Row: UserIssueStance;
+        Insert: UserIssueStanceInsert;
+        Update: UserIssueStanceUpdate;
+        Relationships: [];
+      };
+      user_issue_stance_events: {
+        Row: UserIssueStanceEvent;
+        Insert: UserIssueStanceEventInsert;
         Update: Record<string, unknown>;
         Relationships: [];
       };

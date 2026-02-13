@@ -16,9 +16,9 @@ import { ComposeModal } from "@/components/post/ComposeModal";
 import { apiFetch } from "@/lib/api/client";
 
 const navItems = [
-  { href: "/home", label: "ホーム", icon: MessageSquare },
+  { href: "/home", label: "トピック", icon: MessageSquare },
   { href: "/explore", label: "探索", icon: Compass },
-  { href: "/compose", label: "意見を書く", icon: PenSquare, isCompose: true },
+  { href: "/compose", label: "意見", icon: PenSquare, isCompose: true },
   { href: "/notifications", label: "通知", icon: Bell },
   { href: "/profile", label: "マイページ", icon: User },
 ];
@@ -37,7 +37,7 @@ export function BottomNav() {
   }
 
   return (
-    <nav className="fixed bottom-0 left-0 right-0 z-50 border-t bg-background/80 backdrop-blur-lg lg:hidden">
+    <nav className="fixed bottom-0 left-0 right-0 z-50 border-t bg-background/90 backdrop-blur-xl lg:hidden">
       <div className="mx-auto flex h-16 max-w-lg items-center justify-around px-2">
         {navItems.map((item) => {
           const isActive = pathname.startsWith(item.href);
@@ -53,7 +53,7 @@ export function BottomNav() {
                 aria-label="意見を書く"
                 className="flex items-center justify-center"
               >
-                <span className="relative -top-3 flex h-14 w-14 items-center justify-center rounded-2xl bg-primary text-primary-foreground shadow-lg transition-transform active:scale-90">
+                <span className="relative -top-3 flex h-14 w-14 items-center justify-center rounded-2xl bg-primary text-primary-foreground shadow-[0_10px_24px_-12px_var(--primary)] transition-transform active:scale-90">
                   <PenSquare className="h-6 w-6" />
                 </span>
               </button>

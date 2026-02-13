@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, use } from "react";
+import { useState, useEffect, use, useCallback } from "react";
 import { useSearchParams } from "next/navigation";
 import { Loader2, ArrowLeft } from "lucide-react";
 import { UserCard } from "@/components/user/UserCard";
@@ -37,22 +37,28 @@ export default function FollowsPage({
   const [users, setUsers] = useState<FollowUser[]>([]);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
+  const fetchUsers = useCallback(async () => {
     setLoading(true);
-    apiFetch<{ items: FollowUserApi[]; nextCursor: string | null }>(`/api/users/${handle}/${tab}`)
-      .then((data) => {
-        setUsers(
-          (data.items ?? []).map((u) => ({
-            handle: u.user_handle,
-            displayName: u.display_name,
-            avatarUrl: u.avatar_url,
-            bio: u.bio,
-          }))
-        );
-      })
-      .catch(() => setUsers([]))
-      .finally(() => setLoading(false));
+    try {
+      const data = await apiFetch<{ items: FollowUserApi[]; nextCursor: string | null }>(`/api/users/${handle}/${tab}`);
+      setUsers(
+        (data.items ?? []).map((u) => ({
+          handle: u.user_handle,
+          displayName: u.display_name,
+          avatarUrl: u.avatar_url,
+          bio: u.bio,
+        }))
+      );
+    } catch {
+      setUsers([]);
+    } finally {
+      setLoading(false);
+    }
   }, [handle, tab]);
+
+  useEffect(() => {
+    void fetchUsers();
+  }, [fetchUsers]);
 
   return (
     <div>

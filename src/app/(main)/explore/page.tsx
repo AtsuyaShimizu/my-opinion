@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { Globe, Search } from "lucide-react";
 import { OpinionTile } from "@/components/post/OpinionTile";
 import { TopicCard } from "@/components/theme/TopicCard";
@@ -67,6 +67,7 @@ export default function ExplorePage() {
   const [cursor, setCursor] = useState<string | null>(null);
   const [sort, setSort] = useState<SortMode>("latest");
   const [filters, setFilters] = useState<Record<string, string>>({});
+  const postsInitializedRef = useRef(false);
 
   // -- Theme fetching --
   const fetchThemes = useCallback(async () => {
@@ -125,31 +126,50 @@ export default function ExplorePage() {
     }
   }, []);
 
-  // Fetch on tab change
-  useEffect(() => {
+  const loadTabData = useCallback(async () => {
     setLoading(true);
     setCursor(null);
     setHasMore(true);
-
-    if (activeTab === "themes") {
-      fetchThemes().finally(() => setLoading(false));
-    } else if (activeTab === "posts") {
-      fetchPosts().finally(() => setLoading(false));
-    } else {
-      fetchUsers().finally(() => setLoading(false));
+    try {
+      if (activeTab === "themes") {
+        postsInitializedRef.current = false;
+        await fetchThemes();
+      } else if (activeTab === "posts") {
+        setPosts([]);
+        await fetchPosts();
+        postsInitializedRef.current = true;
+      } else {
+        postsInitializedRef.current = false;
+        await fetchUsers();
+      }
+    } finally {
+      setLoading(false);
     }
   }, [activeTab, fetchThemes, fetchPosts, fetchUsers]);
 
-  // Refetch posts when sort/filters change
-  useEffect(() => {
-    if (activeTab === "posts") {
-      setLoading(true);
-      setCursor(null);
-      setHasMore(true);
-      setPosts([]);
-      fetchPosts().finally(() => setLoading(false));
+  const refreshPosts = useCallback(async () => {
+    if (activeTab !== "posts") return;
+    setLoading(true);
+    setCursor(null);
+    setHasMore(true);
+    setPosts([]);
+    try {
+      await fetchPosts();
+    } finally {
+      setLoading(false);
     }
-  }, [sort, filters, activeTab, fetchPosts]);
+  }, [activeTab, fetchPosts]);
+
+  useEffect(() => {
+    void loadTabData();
+  }, [loadTabData]);
+
+  useEffect(() => {
+    if (activeTab !== "posts" || !postsInitializedRef.current) {
+      return;
+    }
+    void refreshPosts();
+  }, [sort, filters, activeTab, refreshPosts]);
 
   // Listen for new posts
   useEffect(() => {
@@ -204,7 +224,6 @@ export default function ExplorePage() {
                 onClick={() => {
                   if (mode !== sort) {
                     setSort(mode);
-                    setPosts([]);
                   }
                 }}
                 className={cn(

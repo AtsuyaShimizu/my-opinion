@@ -92,7 +92,7 @@ export default function PostDetailPage({
   const [loading, setLoading] = useState(true);
   const [replyOpen, setReplyOpen] = useState(false);
 
-  function mapPostResponse(data: PostApiResponse): PostDisplay {
+  const mapPostResponse = useCallback((data: PostApiResponse): PostDisplay => {
     return {
       id: data.id,
       title: data.title,
@@ -111,9 +111,9 @@ export default function PostDetailPage({
         attributes: mapAttributes(data.author?.attributes ?? null),
       },
     };
-  }
+  }, [currentUser?.id]);
 
-  function mapReplyResponse(data: ReplyApiResponse): PostDisplay {
+  const mapReplyResponse = useCallback((data: ReplyApiResponse): PostDisplay => {
     return {
       id: data.id,
       title: data.title,
@@ -132,9 +132,9 @@ export default function PostDetailPage({
         attributes: mapAttributes(data.author?.attributes ?? null),
       },
     };
-  }
+  }, [currentUser?.id]);
 
-  const fetchPost = useCallback(async () => {
+  const fetchPostData = useCallback(async () => {
     try {
       const postData = await apiFetch<PostApiResponse>(`/api/posts/${id}`);
       setPost(mapPostResponse(postData));
@@ -146,12 +146,20 @@ export default function PostDetailPage({
     } catch {
       toast.error("投稿の取得に失敗しました");
     }
-  }, [id]);
+  }, [id, mapPostResponse, mapReplyResponse]);
+
+  const fetchPostWithLoading = useCallback(async () => {
+    setLoading(true);
+    try {
+      await fetchPostData();
+    } finally {
+      setLoading(false);
+    }
+  }, [fetchPostData]);
 
   useEffect(() => {
-    setLoading(true);
-    fetchPost().finally(() => setLoading(false));
-  }, [fetchPost]);
+    void fetchPostWithLoading();
+  }, [fetchPostWithLoading]);
 
   async function handleReply(content: string) {
     try {
@@ -159,14 +167,14 @@ export default function PostDetailPage({
         method: "POST",
         body: JSON.stringify({ content, parentPostId: id }),
       });
-      fetchPost();
+      fetchPostData();
     } catch {
       toast.error("返信に失敗しました");
     }
   }
 
   const { handleReaction: handleReplyReaction, handleReactionRemove: handleReplyReactionRemove } =
-    useReactionHandler(setReplies, fetchPost);
+    useReactionHandler(setReplies, fetchPostData);
 
   async function handleReaction(postId: string, score: number) {
     if (post && post.id === postId) {

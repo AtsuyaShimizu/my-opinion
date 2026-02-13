@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useForm } from "react-hook-form";
+import { useForm, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { signupSchema, type SignupInput } from "@/lib/validations/auth";
 import { Button } from "@/components/ui/button";
@@ -20,7 +20,7 @@ export default function SignupPage() {
     register,
     handleSubmit,
     setValue,
-    watch,
+    control,
     formState: { errors, isSubmitting },
   } = useForm<SignupInput>({
     resolver: zodResolver(signupSchema),
@@ -31,9 +31,9 @@ export default function SignupPage() {
     },
   });
 
-  const agreedToTerms = watch("agreedToTerms");
-  const agreedToPrivacy = watch("agreedToPrivacy");
-  const agreedToSensitiveInfo = watch("agreedToSensitiveInfo");
+  const agreedToTerms = useWatch({ control, name: "agreedToTerms" });
+  const agreedToPrivacy = useWatch({ control, name: "agreedToPrivacy" });
+  const agreedToSensitiveInfo = useWatch({ control, name: "agreedToSensitiveInfo" });
 
   async function onSubmit(data: SignupInput) {
     setError(null);

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { toast } from "sonner";
 import { ComposeForm } from "./ComposeForm";
@@ -23,12 +23,7 @@ export function ComposeModal({
   defaultThemeName,
 }: ComposeModalProps) {
   const [showSuccess, setShowSuccess] = useState(false);
-
-  useEffect(() => {
-    if (!open) {
-      setShowSuccess(false);
-    }
-  }, [open]);
+  const isSuccessVisible = open && showSuccess;
 
   async function handleSubmit(content: string, title?: string) {
     try {
@@ -40,8 +35,8 @@ export function ComposeModal({
   }
 
   return (
-    <Dialog open={open} onOpenChange={(v) => { if (!showSuccess) onOpenChange(v); }}>
-      <DialogContent className="gap-0 overflow-hidden p-0 sm:max-w-lg sm:rounded-2xl" showCloseButton={!showSuccess}>
+    <Dialog open={open} onOpenChange={(v) => { if (!isSuccessVisible) onOpenChange(v); }}>
+      <DialogContent className="gap-0 overflow-hidden p-0 sm:max-w-lg sm:rounded-2xl" showCloseButton={!isSuccessVisible}>
         <ComposeForm
           onSubmit={handleSubmit}
           replyTo={replyTo}

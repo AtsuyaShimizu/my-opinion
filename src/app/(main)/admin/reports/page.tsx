@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { Loader2, ArrowLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -49,7 +49,7 @@ export default function AdminReportsPage() {
   const [statusFilter, setStatusFilter] = useState<string>("");
   const [updatingId, setUpdatingId] = useState<string | null>(null);
 
-  function fetchReports() {
+  const fetchReports = useCallback(() => {
     setLoading(true);
     const params = new URLSearchParams();
     if (statusFilter) params.set("status", statusFilter);
@@ -58,11 +58,11 @@ export default function AdminReportsPage() {
       .then((data) => setReports(data.reports))
       .catch(() => setReports([]))
       .finally(() => setLoading(false));
-  }
+  }, [statusFilter]);
 
   useEffect(() => {
     fetchReports();
-  }, [statusFilter]);
+  }, [fetchReports]);
 
   async function handleStatusChange(reportId: string, newStatus: string) {
     setUpdatingId(reportId);

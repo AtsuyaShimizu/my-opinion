@@ -36,6 +36,13 @@ interface OpinionTileProps {
   className?: string;
 }
 
+function getToneLabel(score: number | null) {
+  if (score === null) return "反応待ち";
+  if (score <= 33) return "異論寄り";
+  if (score <= 66) return "中立寄り";
+  return "共感寄り";
+}
+
 export function OpinionTile({
   id,
   author,
@@ -68,11 +75,31 @@ export function OpinionTile({
   return (
     <article
       className={cn(
-        "break-inside-avoid rounded-2xl border bg-card transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md",
+        "break-inside-avoid overflow-hidden rounded-2xl border border-border/70 bg-card transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md",
         className
       )}
     >
       <div className="p-4">
+        <div className="mb-3 flex items-center justify-between gap-2">
+          <span
+            className={cn(
+              "rounded-full px-2.5 py-1 text-[11px] font-semibold",
+              averageScore === null
+                ? "bg-muted text-muted-foreground"
+                : averageScore <= 33
+                  ? "bg-rose-500/10 text-rose-700 dark:text-rose-300"
+                  : averageScore <= 66
+                    ? "bg-amber-500/10 text-amber-700 dark:text-amber-300"
+                    : "bg-emerald-500/10 text-emerald-700 dark:text-emerald-300"
+            )}
+          >
+            {getToneLabel(averageScore)}
+          </span>
+          <span className="text-xs tabular-nums text-muted-foreground">
+            平均 {averageScore ?? "--"}
+          </span>
+        </div>
+
         {/* Theme name */}
         {themeName && (
           <span className="text-xs font-medium text-primary">
